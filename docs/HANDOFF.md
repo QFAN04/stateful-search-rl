@@ -35,7 +35,7 @@
 - 所有脚本都要支持 `--resume`，并按 checkpoint 规范保存（见 CLAUDE.md）。
 
 ## 5. 协作方式（用户已确认）
-- 协议文件：`C:\Users\GQF\.gemini\config\skills\multi-model-collaboration\SKILL.md`（软链接自 `C:\Users\GQF\.claude\skills\...`），定义 codex / dsh 等 CLI 的调用方式和防冲突规则。
+- 协议文件：`C:\Users\GQF\.gemini\config\skills\multi-model-collaboration\SKILL.md`（软链接自 `C:\Users\GQF\.claude\skills\...`），定义 codex / dsh 等 CLI 的调用方式和防冲突规则。Gemini 通过 Antigravity CLI（`agy`，`C:SERSGQF.LOCALBINGY.EXE`ϼ�Ȱ�ǔ�À�
 - 用户采纳了 Gemini 的提醒"分工太碎、频繁切换 CLI 成本高"。**跑通实验、拿到日志第一；Claude 主导全局并写核心代码**；GPT（codex）只在约定节点做只读审查；Gemini / DeepSeek 只接互不相交的并行杂活；DeepSeek API 用作教师模型和 judge。可用模型以开工时查到的为准（GPT 6.1 sol / 6 astra，Gemini 4 Argon / 3.8 Flash，DeepSeek Flash）。
 
 ## 6. 本地环境

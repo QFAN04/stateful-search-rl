@@ -52,7 +52,7 @@ D1 环境 + Go/No-Go → D2 probe + 一致性检查 → D3 策略实现 + 单测
 ## 协作分工（用户已确认；遵循 multi-model-collaboration 协议）
 - **跑通实验、拿到日志是第一优先级。** Claude 主导全局并编写核心代码。
 - GPT（codex）：只读独立审查，只在约定节点介入（见下方「审查节点」），发现的问题由 Claude 修复。
-- Gemini / DeepSeek：只接与核心文件不相交、规格清楚的并行任务；DeepSeek API 用作教师模型 / judge。
+- Gemini（通过 Antigravity CLI `agy` 调用）/ DeepSeek：只接与核心文件不相交、规格清楚的并行任务；DeepSeek API 用作教师模型 / judge。
 - 同一文件同一时间只能有一个 agent 修改；任何外部 agent 说"完成"后，主控必须自己看 diff、跑测试。
 - 用户本人必须读懂关键路径代码（标注 ★ 的模块），并能讲清对应单测在测什么。
 
