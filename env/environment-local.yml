@@ -1,0 +1,24 @@
+# 本地 Windows 轻量环境（两个项目共用）：只用于单元测试、数据处理、分析画图。
+# 不装 torch / vLLM / veRL —— 训练与推理只在 GPU 机器的 Docker 镜像中运行（见 env/GPU_ENV.md）。
+# 创建：conda env create -f env/environment-local.yml
+name: llm-rl
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - numpy
+      - pandas
+      - pyarrow
+      - scipy
+      - matplotlib
+      - pyyaml
+      - tqdm
+      - jsonlines
+      - datasets
+      - transformers   # 仅用 tokenizer 做 mask / 分词相关单测
+      - tokenizers
+      - google-cloud-storage
+      - pytest
+      - ruff

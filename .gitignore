@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# 实验产物（同步到 GCS，不进 git）
+runs/
+checkpoints/
+outputs/
+wandb/
+*.ckpt
+*.safetensors
+*.pt
+
+# 数据（manifest 进 git，原始数据与缓存不进）
+data/raw/
+data/cache/
+data/processed/
+*.parquet
+!data/manifests/**
+
+# 密钥
+.env
+*.key
+gcp-key*.json
+
+# 系统 / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

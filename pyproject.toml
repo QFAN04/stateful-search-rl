@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ssrl"
+version = "0.0.1"
+description = "StatefulSearch-RL: context management for multi-turn search agent RL"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["gpu: 需要 GPU 机器才能运行的测试（本地跳过）"]
+
+[tool.ruff]
+line-length = 100
