@@ -35,12 +35,12 @@
 - 所有脚本都要支持 `--resume`，并按 checkpoint 规范保存（见 CLAUDE.md）。
 
 ## 5. 协作方式（用户已确认）
-- 协议文件：`C:\Users\GQF\.gemini\config\skills\multi-model-collaboration\SKILL.md`（软链接自 `C:\Users\GQF\.claude\skills\...`），定义 codex / dsh 等 CLI 的调用方式和防冲突规则。Gemini 通过 Antigravity CLI（`agy`，`C:SERSGQF.LOCALBINGY.EXE`ϼ�Ȱ�ǔ�À�
+- 协议文件：`C:\Users\GQF\.gemini\config\skills\multi-model-collaboration\SKILL.md`（软链接自 `C:\Users\GQF\.claude\skills\...`），定义 codex / dsh 等 CLI 的调用方式和防冲突规则。Gemini 通过 Antigravity CLI（`agy`，`C:\Users\GQF\.local\bin\agy.exe`）调用。
 - 用户采纳了 Gemini 的提醒"分工太碎、频繁切换 CLI 成本高"。**跑通实验、拿到日志第一；Claude 主导全局并写核心代码**；GPT（codex）只在约定节点做只读审查；Gemini / DeepSeek 只接互不相交的并行杂活；DeepSeek API 用作教师模型和 judge。可用模型以开工时查到的为准（GPT 6.1 sol / 6 astra，Gemini 4 Argon / 3.8 Flash，DeepSeek Flash）。
 
 ## 6. 本地环境
 - 新建 conda 环境 `llm-rl`（Python 3.12，**不装 torch**），两个项目共用：`conda env create -f env/environment-local.yml`。只用于单测、数据处理和画图。不复用 cs336，避免污染课程环境。
-- gcloud SDK 装在 `D:\GoogleCloudSDK\google-cloud-sdk`。用户环境变量 `CLOUDSDK_PYTHON` 当前指向 `ml-learning`，**用户希望改掉**。建议：如果存在 `platform\bundledpython\python.exe` 就删掉这个变量；否则单独建一个 `gcloud-py` 环境并指向它。不要把它绑到项目环境上。
+- gcloud SDK：PATH 上只保留 `C:\Users\GQF\AppData\Local\Google\Cloud SDK\google-cloud-sdk`（自带 bundledpython）。`CLOUDSDK_PYTHON` 已删除，`D:\GoogleCloudSDK` 已从 PATH 移除（2026-11-02）。
 - 训练环境：GPU 机器上的 veRL 0.7.x Docker 镜像，D1 固定版本，记录在 `env/GPU_ENV.md`。
 
 ## 7. 当前状态与待办
