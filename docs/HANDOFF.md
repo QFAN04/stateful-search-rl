@@ -26,7 +26,7 @@
 - **主项目底座：Agent-R1**（基于 veRL 0.7.0，step-level MDP，由环境决定每步 observation，自带 HotpotQA recipe）。2026-11-02 查证时：veRL 原生 agent loop 和 Search-R1 都是"一条轨迹一个拼接序列 + 工具 token mask"，不支持逐轮重写上下文。Agent-R1 新版用户少，所以 D1 设 Go/No-Go，失败就退回 Search-R1。
 - **副项目**：执行增强的生成式 verifier。用离线执行缓存，训练纯文本单轮 GRPO（veRL 0.7，和主项目同一个镜像）。不依赖 AgentV-RL，因为它面向数学任务。与参考简历"1.5B 标量 verifier 门控失败"的区别在于：我们做生成式、带执行证据、目标是选择和拦截。核心洞察点是**题内 AUROC**，用来区分真实区分能力和题目难度先验。
   - v3.1（用户回看 GPT v1 / Gemini v2 后补齐）：v2 对公开测试全过的候选几乎没有执行信号，所以加入**离线探针输入**（DeepSeek 只生成输入、不生成期望输出，证据是崩溃 / 超时 / 输出一致性），保留 v1"自己构造测试"的能力但避开期望输出不可靠的问题；加入 **MBR-exec 强基线**、未见 solver 评测、配对 bootstrap、Python 时限倍数、标签噪声说明；删除门控自修复；项目对外名称去掉 "agentic"（verifier 不调用工具）。
-  - 同日审查后的修正：输出一致性只对**固定参照池**（每题另采 R=4 个参照解，不参与选择）计算，否则 N<8 的 BoN 会看到子集外候选；MBR-exec 用同一参照池；消融 A1b 完整重训、A1a 只做到 SFT；探针生成器 / 校验器代码只在沙箱运行；`gen_probes.py` 列为 ★。
+  - 同日审查后的修正：verifier 只看**本候选自己**的探针结果，候选间一致性不喂给 verifier（否则 N<8 的 BoN 会看到子集外候选），只由 MBR-exec 在子集内计算、H1 检验互补（曾考虑"固定参照池"方案，因副项目应保持简单、要多采样而放弃）；消融 A1b 完整重训、A1a 只做到 SFT；探针生成器 / 校验器代码只在沙箱运行；`gen_probes.py` 列为 ★。
 - **模型**：两个项目统一用 Qwen3-4B-Instruct-2507。不选 Qwen3.5-4B，因为它是 Mamba 混合架构，在 veRL / vLLM 上有适配风险。副项目的 solver 是 Qwen2.5-Coder-7B-Instruct + Qwen3-4B 混合。
 - **两周并行**：主项目 D1 启动，副项目 D2 启动，D14 一起收尾。副项目前一周以 CPU 工作为主，和主项目错峰使用 GPU。
 
