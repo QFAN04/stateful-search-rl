@@ -195,6 +195,8 @@ stateful-search-rl/
 | ID | 策略 | 内容 | 优先级 |
 |---|---|---|---|
 | P0 | — | Pre-GRPO probe（C0、C2 两种 prompt） | 必做，D2 |
+| B0 | — | 无检索直接作答（只推理，与 E0 同模型、同答案解析器） | 必做；D2 在 dev-select 上跑，D9 与 E0–E3 一起跑一次封存 test；成本极低 |
+| B1 | — | 单次检索 RAG：用同一检索服务取 top-k（k=3，与训练一致）后一次作答（只推理，同答案解析器） | 必做；D2 在 dev-select 上跑，D9 与 E0–E3 一起跑一次封存 test；成本极低 |
 | E0 | C0 append | GRPO 基线 | 必做 |
 | E1 | C1 window | GRPO | 必做 |
 | E2 | C2 curate | GRPO | 必做（核心） |
@@ -218,11 +220,11 @@ stateful-search-rl/
 | 天 | 主项目任务 | 验收（未达标不往下走） |
 |---|---|---|
 | D1 | 搭 veRL 0.7 + Agent-R1 环境（Docker 镜像）；拉起检索服务；用小模型（Qwen3-1.7B 或 0.6B）跑通 HotpotQA recipe 10 步 | **Go/No-Go**：recipe 10 步无报错，轨迹可回放。不行就当天切到 Search-R1，C2 改为自己做逐轮样本，范围缩到 C0/C1/C2 |
-| D2 | 在 4B 上跑 Pre-GRPO probe（C0 和 C2 prompt）；写 `logprob_consistency.py` 并跑一次 | 格式合法率 ≥ 80%，否则 D3 加轻量 SFT（四组同源）；一致性报告产出 |
+| D2 | 在 4B 上跑 Pre-GRPO probe（C0 和 C2 prompt）；在 dev-select 上跑 B0/B1 基线；写 `logprob_consistency.py` 并跑一次 | 格式合法率 ≥ 80%，否则 D3 加轻量 SFT（四组同源）；B0/B1 的 dev EM；一致性报告产出 |
 | D3 | 实现 C1/C2/C3 和单元测试（mask、上下文构造、优势广播、断点恢复）；测吞吐，定全参还是 LoRA、卡数 | 单测全绿；实验卡写好（含 checkpoint 选择规则） |
 | D4–D5 | E0 训练；同时 E2 冒烟 20 步 | E0 reward 上升、无 NaN、轨迹抽查合理 |
 | D6–D8 | E1、E2、E3 训练（4 卡时两组并行） | 每组都有 dev 曲线和 checkpoint |
-| D9 | 所有组跑封存 test 和 OOD；笔记质量评估 | 结果表 + 帕累托图初版 |
+| D9 | 所有组（含 B0/B1）跑封存 test 和 OOD；笔记质量评估 | 结果表 + 帕累托图初版 |
 | D10–D11 | 行为诊断、失败案例分析；有预算就跑 E4/E5 | 分析报告初稿 |
 | D12 | 放宽轮数的外推实验；补图 | — |
 | D13–D14 | 写最终报告、README、复现脚本；**用真实数字**填写简历 bullet | 别人能按 README 复现 E0 |
