@@ -49,11 +49,12 @@
 - [x] 两个仓库的骨架、CLAUDE.md、实验卡模板、本地环境配置文件
 
 用户侧待办（开工前）：
-- [ ] GCP：账户已升级为付费（计费已开启）→ 配额申请 → 等待审批（2026-11-02 查询：GPUS_ALL_REGIONS=1，仅 us-central1 / asia-southeast1 各 1 张 Spot A100 80GB）
+- [x] GCP：账户已升级为付费；2026-11-02 配额申请结果：GPUS_ALL_REGIONS=1，CPUS_ALL_REGIONS=64；Spot A100 80GB 仅 us-central1、asia-southeast1 各 1 张；L4 各区域 1 张。新项目有启动限制，计划在产生 GPU 计费且满 48h 后再申请 us-central1 的 A100 扩容
+- [ ] GCP 配额扩容（D4 正式训练前需要 ≥2 张 A100，否则按 §4 退路缩规模）
 - [x] 修正 `CLOUDSDK_PYTHON`（2026-11-02 已删除该用户变量，PATH 上的 gcloud 用自带 bundledpython），`gcloud auth login`，项目 `llm-rl-lab-2026`
 - [x] `conda env create -f env/environment-local.yml`（Python 3.12），两个仓库分别 `pip install -e .`，`pytest` 通过（2026-11-02）
 - [x] 两个仓库分别 `git init` 并做首次提交（2026-11-02）
-- [ ] GitHub 建私有仓库并 push
+- [x] GitHub 私有仓库已建并 push（QFAN04/stateful-search-rl、QFAN04/agentic-verifier-code），提交身份 QIFAN004@e.ntu.edu.sg（仓库级配置）
 - [ ] 前置阅读：Agent-R1 的 step-level 设计、Search-R1 的 `search_r1/llm_agent/generation.py`、veRL 的 GRPO 配置、MemAgent（BytedTsinghua-SIA 版）
 
 Claude Code 开工后第一步（主项目 D1，详见 PLAN §8）：
@@ -66,4 +67,4 @@ Claude Code 开工后第一步（主项目 D1，详见 PLAN §8）：
 - 全参还是 LoRA（D3 实测吞吐后决定）
 - 是否需要 SFT 冷启动（D2 看 probe 的格式合法率，阈值 80%）
 - 检索语料与索引（D1 优先用 Agent-R1 自带的，否则用 Search-R1 的 e5 + wiki-18）
-- GCP 实际批下的卡数和区域
+- GCP 实际批下的卡数（区域已定：us-central1 为主力，与两个 GCS 桶同区）
