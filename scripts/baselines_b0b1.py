@@ -13,9 +13,14 @@
 import argparse
 import hashlib
 import json
+import os
 import pathlib
 import sys
 import time
+
+# 检索器（torch / FlagEmbedding）会先在主进程初始化 CUDA，vLLM 默认 fork 出引擎进程会因此报
+# "CUDA error: initialization error"，所以强制用 spawn
+os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "third_party" / "Agent-R1"))

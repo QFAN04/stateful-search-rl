@@ -6,7 +6,7 @@ Agent-R1 每步样本直接使用 vLLM 返回的 token ids 与 logprobs（接口
 
 - `compare()`：纯 numpy，按 mask 只统计有效 response token，单元测试见 tests/test_logprob.py
 - `main()`：GPU 上运行（Colab 即可）。用 B1 式 prompt（问题 + 检索段落）在 dev_select 上采样，再用 HF 重算并比较
-  用法：python -I -m ssrl.checks.logprob_consistency --split <dev_select.parquet> --corpus-dir <dir> --out runs/<run_id>
+  用法：PYTHONPATH=src python -m ssrl.checks.logprob_consistency（不能加 -I，否则 PYTHONPATH 被忽略） --split <dev_select.parquet> --corpus-dir <dir> --out runs/<run_id>
 """
 from __future__ import annotations
 
@@ -62,7 +62,10 @@ def main() -> None:
     args = ap.parse_args()
 
     import gc
+    import os
     import sys
+
+    os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")  # 原因同 scripts/baselines_b0b1.py
 
     import pandas as pd
     import torch

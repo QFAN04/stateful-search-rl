@@ -23,7 +23,7 @@
 # 先用 --limit 20 冒烟，确认输出格式与 EM 计算正常，再全量（500 题）
 !python -I scripts/baselines_b0b1.py --split data/processed/hotpotqa_splits/dev_select.parquet \
     --corpus-dir /content/agent-r1-data/hotpotqa_corpus --out runs/d2_b0b1_dev_q3-4b-2507_<日期>
-!PYTHONPATH=src python -I -m ssrl.checks.logprob_consistency --split data/processed/hotpotqa_splits/dev_select.parquet \
+!PYTHONPATH=src python -m ssrl.checks.logprob_consistency --split data/processed/hotpotqa_splits/dev_select.parquet \
     --corpus-dir /content/agent-r1-data/hotpotqa_corpus --out runs/d2_logprob_q3-4b-2507_<日期> --n 64
 ```
 跑完：`gsutil -m rsync -r runs/<run_id> gs://ssrl-runs-gqf-2026/runs/<run_id>`，然后销毁 Colab 会话。
@@ -31,4 +31,6 @@
 ## 4. 注意
 - B0/B1 只在 dev_select 上跑；封存 test 到 D9 与 E0–E3 一起只跑一次。
 - B1 的检索与 recipe 首次自动检索完全相同（同一检索器类、top-5、问题原文作 query）。
-- 一致性检查只覆盖"推理引擎 vs 训练前向"的数值差异（Agent-R1 直接使用 vLLM 返回的 token ids，不存在重新分词问题，见接口笔记 §1.3）。Colab 的 GPU 型号与 A100 不同，结果需注明硬件；正式训练前可在 A100 上补跑一次。
+- 一致性检查只覆盖"推理引擎 vs 训练前向"的数值差异（Agent-R1 直接使用 vLLM 返回的 token ids，不存在重新分词问题，见接口笔记 §1.3）。**2026-11-03 起改为在 A100 训练镜像里跑**（`scripts/gcp/submit_job.sh` 派给轮询流程）：Colab 自动装的是 vLLM 0.33 / torch 2.14 / transformers 5.20，与训练镜像（vLLM 0.12 / torch 2.9 / transformers 4.57）不同，测出的差值不代表训练栈。
+- Colab CLI（Windows）注意：`colab exec -f` 需设 `PYTHONUTF8=1`（否则按 GBK 读含中文的脚本）；Git Bash 下远端路径需 `MSYS_NO_PATHCONV=1`；长任务用 `scripts/colab/launch_bg.py` 在内核里后台启动，避免 CLI 等待超时。
+- vLLM 与检索器同进程时必须用 spawn 起引擎进程（脚本已设 `VLLM_WORKER_MULTIPROC_METHOD=spawn`），否则报 CUDA initialization error。
