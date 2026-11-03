@@ -29,7 +29,8 @@ append_gcs() {  # GCS 对象不能追加：拉下来、追加一行、再传回
 for m in DONE FAILED; do
   if gcs_exists "runs/$RUN_ID/$m"; then
     # 只在第一次看到标记时写 GCS，之后静默
-    if ! grep -q "marker $m" "$LOCAL" 2>/dev/null; then line="$ts marker $m found; stop starting $VM"; echo "$line" >> "$LOCAL"; append_gcs "$line"; fi
+    if ! grep -q "run=$RUN_ID marker $m" "$LOCAL" 2>/dev/null; then  # 按任务区分，避免上一个任务的记录让本任务静默
+      line="$ts run=$RUN_ID marker $m found; stop starting $VM"; echo "$line" >> "$LOCAL"; append_gcs "$line"; fi
     exit 0
   fi
 done
