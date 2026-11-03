@@ -47,7 +47,7 @@ sync_loop() { while sleep "$SYNC_EVERY"; do bash "$REPO/scripts/gcp/sync_to_gcs.
 sync_loop & SYNC_PID=$!
 trap 'kill $SYNC_PID 2>/dev/null || true; bash "$REPO/scripts/gcp/sync_to_gcs.sh" "$RUN_ID" "$REPO/runs" || true' EXIT
 
-docker exec \
+${DOCKER:-sudo docker} exec \
   -e RUN_DIR="$CTR_RUN_DIR" -e STEPS="$STEPS" -e MODEL="$MODEL" -e RESUME_MODE="$RESUME_MODE" \
   -e VERL_FILE_LOGGER_PATH="$CTR_RUN_DIR/metrics.attempt$ATTEMPT.jsonl" \
   -e HOTPOTQA_CORPUS_DATA_ROOT="$CORPUS_ROOT" \
