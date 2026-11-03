@@ -4,6 +4,8 @@
 set -euo pipefail
 source "$(dirname "$0")/config.sh"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+# Windows Git Bash 下 gcloud 是 Windows 程序，逗号拼接的 metadata 路径不会被自动转换，所以用 Windows 形式路径
+command -v cygpath >/dev/null && REPO="$(cygpath -m "$REPO")"
 TARGET_VM=ssrl-a100
 TARGET_ZONE=us-central1-c
 POLLER=ssrl-poller
