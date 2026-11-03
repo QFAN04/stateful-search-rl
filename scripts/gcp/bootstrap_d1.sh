@@ -13,12 +13,12 @@ done_step() { touch "$MARK/$1"; }
 is_done() { [[ -f "$MARK/$1" ]]; }
 
 # 1. Docker + NVIDIA container toolkit
-is_done docker || { bash ~/setup_vm.sh; done_step docker; }
+is_done docker2 || { bash ~/setup_vm.sh; done_step docker2; }
 DOCKER="sudo docker"
 
 # 2. 仓库：从 bundle 克隆；子模块（公开）从 GitHub 拉并固定 SHA
 if ! is_done repo; then
-  [[ -d "$REPO/.git" ]] || git clone ~/repo.bundle "$REPO"
+  [[ -d "$REPO/.git" ]] || git clone -b main ~/repo.bundle "$REPO"
   git -C "$REPO" submodule update --init third_party/Agent-R1
   git -C "$REPO/third_party/Agent-R1" checkout "$AGENT_R1_SHA"
   done_step repo

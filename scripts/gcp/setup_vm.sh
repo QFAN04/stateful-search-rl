@@ -21,6 +21,9 @@ if ! dpkg -s nvidia-container-toolkit >/dev/null 2>&1; then
     | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list >/dev/null
   sudo apt-get update -y
   sudo apt-get install -y nvidia-container-toolkit
+fi
+# DLVM 可能已预装 toolkit 但没在 Docker 里注册 nvidia runtime，所以单独检查
+if ! sudo docker info 2>/dev/null | grep -qi 'Runtimes:.*nvidia'; then
   sudo nvidia-ctk runtime configure --runtime=docker
   sudo systemctl restart docker
 fi
