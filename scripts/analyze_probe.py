@@ -2,7 +2,8 @@
 
 用法：python -I scripts/analyze_probe.py runs/<run_id>
 读 val_greedy/*.jsonl 和 val_sample/*.jsonl（各自目录下应只有一个文件）。
-同一道题由第一步的 input 文本识别（同题首步 prompt 相同：问题 + 确定性的首次检索结果）。
+同一道题按 prompt 中 `### User Query` 段的问题文本识别。注意：validation 落盘的 `input` 是
+prompt+response 拼接后的解码（上游 _validate 解码 input_ids），不能直接用整段 input 当题目键。
 """
 import collections
 import json
@@ -12,6 +13,13 @@ import re
 import sys
 
 SEARCH_RE = re.compile(r'"name"\s*:\s*"search"')
+QUERY_RE = re.compile(r"### User Query\n(.*?)\n\n### History", re.S)
+
+
+def question_of(t: dict) -> str:
+    m = QUERY_RE.search(t["steps"][0]["input"])
+    assert m, "cannot find '### User Query' in first-step input"
+    return m.group(1)
 
 
 def load(d: pathlib.Path) -> list[dict]:
@@ -55,7 +63,7 @@ def main() -> None:
     s = load(run / "val_sample")
     groups = collections.defaultdict(list)
     for t in s:
-        groups[t["steps"][0]["input"]].append(t["score"] > 0)
+        groups[question_of(t)].append(t["score"] > 0)
     sizes = collections.Counter(len(v) for v in groups.values())
     res = {"n_questions": len(groups), "group_sizes": dict(sizes)}
     for k in (1, 2, 4, 8):
