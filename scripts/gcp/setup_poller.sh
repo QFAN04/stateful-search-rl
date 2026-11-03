@@ -57,6 +57,14 @@ run gcloud compute instances add-iam-policy-binding "$TARGET_VM" --zone="$TARGET
   --member="serviceAccount:$SA" --role="projects/$GCP_PROJECT/roles/$ROLE"
 # IAM 条件需要桶开启统一访问控制（桶内未使用对象 ACL）
 run gcloud storage buckets update "$GCS_BUCKET" --uniform-bucket-level-access
+# 开启统一访问控制后对象 ACL 失效，项目 Owner/Editor/Viewer（含 A100 的默认服务账号）会读不到对象，
+# 必须补上与原默认对象 ACL 等价的绑定（2026-11-03 漏掉过一次，导致 A100 开机后拿不到代码）
+for m in projectOwner projectEditor; do
+  run gcloud storage buckets add-iam-policy-binding "$GCS_BUCKET" --member="$m:$GCP_PROJECT" \
+    --role=roles/storage.legacyObjectOwner --condition=None
+done
+run gcloud storage buckets add-iam-policy-binding "$GCS_BUCKET" --member="projectViewer:$GCP_PROJECT" \
+  --role=roles/storage.legacyObjectReader --condition=None
 run gcloud storage buckets add-iam-policy-binding "$GCS_BUCKET" \
   --member="serviceAccount:$SA" --role=roles/storage.objectUser \
   --condition="title=runs-prefix-only,expression=resource.name.startsWith(\"projects/_/buckets/$BUCKET/objects/runs/\")"
