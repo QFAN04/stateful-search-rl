@@ -1,6 +1,6 @@
 """分析 D2 probe 的 validation 落盘（trainer.validation_data_dir 下的 <step>.jsonl）。
 
-用法：python -I scripts/analyze_probe.py runs/<run_id>
+用法：python -I scripts/analyze_probe.py runs/<run_id> [--ffs-off]
 读 val_greedy/*.jsonl 和 val_sample/*.jsonl（各自目录下应只有一个文件）。
 同一道题按 prompt 中 `### User Query` 段的问题文本识别。注意：validation 落盘的 `input` 是
 prompt+response 拼接后的解码（上游 _validate 解码 input_ids），不能直接用整段 input 当题目键。
@@ -13,7 +13,7 @@ import re
 import sys
 
 SEARCH_RE = re.compile(r'"name"\s*:\s*"search"')
-QUERY_RE = re.compile(r"### User Query\n(.*?)\n\n### History", re.S)
+QUERY_RE = re.compile(r"### User Query\n(.*?)\n\n### History", re.DOTALL)
 
 
 def question_of(t: dict) -> str:
@@ -36,10 +36,12 @@ def end_reason(text: str) -> str:
     return "no_answer_no_tool"
 
 
-def behavior(trajs: list[dict]) -> dict:
+def behavior(trajs: list[dict], ffs: bool) -> dict:
     steps = collections.Counter(t["num_steps"] for t in trajs)
     reasons = collections.Counter(end_reason(t["steps"][-1]["output"]) for t in trajs)
     searches = [sum(len(SEARCH_RE.findall(s["output"])) for s in t["steps"][:-1]) for t in trajs]
+    # 检索轮数 = 自动首搜（开启时）+ 模型发起检索的步数；上下文策略只有在 ≥2 轮时才会让各组 prompt 不同
+    rounds = [int(ffs) + sum(bool(SEARCH_RE.search(s["output"])) for s in t["steps"][:-1]) for t in trajs]
     n = len(trajs)
     return {
         "n_traj": n,
@@ -47,6 +49,8 @@ def behavior(trajs: list[dict]) -> dict:
         "end_reason_frac": {k: round(v / n, 3) for k, v in reasons.most_common()},
         "searches_per_traj_mean": round(sum(searches) / n, 3),
         "frac_traj_with_extra_search": round(sum(s > 0 for s in searches) / n, 3),
+        "retrieval_rounds": dict(sorted(collections.Counter(rounds).items())),
+        "frac_multi_round": round(sum(r >= 2 for r in rounds) / n, 3),
     }
 
 
@@ -56,9 +60,10 @@ def pass_at_k(n: int, c: int, k: int) -> float:
 
 def main() -> None:
     run = pathlib.Path(sys.argv[1])
-    out = {}
+    ffs = not (len(sys.argv) > 2 and sys.argv[2] == "--ffs-off")  # 关闭自动首搜的配置要传 --ffs-off
+    out = {"force_first_search": ffs}
     g = load(run / "val_greedy")
-    out["greedy"] = {"em": round(sum(t["score"] > 0 for t in g) / len(g), 4), **behavior(g)}
+    out["greedy"] = {"em": round(sum(t["score"] > 0 for t in g) / len(g), 4), **behavior(g, ffs)}
 
     s = load(run / "val_sample")
     groups = collections.defaultdict(list)
@@ -72,7 +77,7 @@ def main() -> None:
     res["all_wrong_frac"] = round(sum(c == 0 for c in cs) / len(cs), 4)
     res["all_correct_frac"] = round(sum(c == len(v) for c, v in zip(cs, groups.values())) / len(cs), 4)
     res["mixed_frac"] = round(1 - res["all_wrong_frac"] - res["all_correct_frac"], 4)
-    out["sample"] = {**res, **behavior(s)}
+    out["sample"] = {**res, **behavior(s, ffs)}
     print(json.dumps(out, indent=1, ensure_ascii=False))
     (run / "probe_summary.json").write_text(json.dumps(out, indent=1, ensure_ascii=False))
 

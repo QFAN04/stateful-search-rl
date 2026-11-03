@@ -23,6 +23,13 @@ esac
 cd "$(dirname "$0")/../third_party/Agent-R1"
 PROJECT_DIR="$(pwd)"
 export HOTPOTQA_DATA_ROOT="$PROJECT_DIR/data/corpus/hotpotqa"
+# flow 配置：默认 recipe 原版（C0）；环境配置 probe 用 configs/flows/*.yaml（路径相对仓库根目录）
+FLOW_CONFIG="${FLOW_CONFIG:-$PROJECT_DIR/recipes/hotpotqa/base.yaml}"
+[[ "$FLOW_CONFIG" = /* ]] || FLOW_CONFIG="$PROJECT_DIR/../../$FLOW_CONFIG"
+FLOW_NAME="${FLOW_NAME:-hotpotqa_agent}"
+# 我们的 flow 子类在 src/ssrl 下，Ray worker 也要能 import（同时经 runtime_env 显式传递）
+PYPATH="$PROJECT_DIR/../../src:$PROJECT_DIR"
+export PYTHONPATH="$PYPATH:${PYTHONPATH:-}"
 
 python3 -m agent_r1.trainer.main_agent_ppo \
     algorithm.adv_estimator=grpo \
@@ -50,9 +57,10 @@ python3 -m agent_r1.trainer.main_agent_ppo \
     actor_rollout_ref.rollout.val_kwargs.do_sample=$DO_SAMPLE \
     actor_rollout_ref.rollout.val_kwargs.temperature=$TEMP \
     actor_rollout_ref.rollout.val_kwargs.top_p=1.0 \
-    actor_rollout_ref.rollout.agent.agent_flow_config_path="$PROJECT_DIR/recipes/hotpotqa/base.yaml" \
+    actor_rollout_ref.rollout.agent.agent_flow_config_path="$FLOW_CONFIG" \
     actor_rollout_ref.rollout.agent.num_workers=4 \
-    actor_rollout_ref.rollout.agent.default_agent_flow=hotpotqa_agent \
+    actor_rollout_ref.rollout.agent.default_agent_flow="$FLOW_NAME" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.PYTHONPATH="$PYPATH" \
     actor_rollout_ref.rollout.trace.backend=null \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     critic.enable=False \
