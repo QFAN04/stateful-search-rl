@@ -53,6 +53,9 @@
 用户侧待办（开工前）：
 - [x] GCP：账户已升级为付费；2026-11-02 配额申请结果：GPUS_ALL_REGIONS=1，CPUS_ALL_REGIONS=64；Spot A100 80GB 仅 us-central1、asia-southeast1 各 1 张；L4 各区域 1 张。新项目有启动限制，计划在产生 GPU 计费且满 48h 后再申请 us-central1 的 A100 扩容
 - [ ] GCP 配额扩容（D4 正式训练前需要 ≥2 张 A100，否则按 PLAN §11「GCP 配额被拒或延迟」的退路：LoRA + 缩小训练集与步数）
+  - **首次 GPU 计费开始：2026-11-03 07:21:49 UTC（北京时间 15:21）**，VM `ssrl-a100`（us-central1-c，Spot a2-ultragpu-1g）。
+  - **满 48 小时 = 2026-11-05 07:22 UTC（北京时间 11-05 15:22）后提醒用户申请扩容**：`GPUS_ALL_REGIONS=4`、us-central1 `PREEMPTIBLE_NVIDIA_A100_80GB_GPUS=4`。SSD_TOTAL_GB 已于 11-03 提到 1024GB。
+  - 11-03 建机时 us-central1-a / -c 都出现过 Spot STOCKOUT，用 `scripts/gcp/retry_create.sh` 在两个 zone 间轮流重试拿到。
 - [x] 修正 `CLOUDSDK_PYTHON`（2026-11-02 已删除该用户变量，PATH 上的 gcloud 用自带 bundledpython），`gcloud auth login`，项目 `llm-rl-lab-2026`
 - [x] `conda env create -f env/environment-local.yml`（Python 3.12），两个仓库分别 `pip install -e .`，`pytest` 通过（2026-11-02）
 - [x] 两个仓库分别 `git init` 并做首次提交（2026-11-02）
