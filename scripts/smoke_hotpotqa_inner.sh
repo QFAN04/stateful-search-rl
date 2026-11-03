@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # D1 冒烟：Agent-R1 HotpotQA recipe 单卡 GRPO。在容器内运行，由 scripts/smoke_hotpotqa.sh 调用。
 # 复制自 third_party/Agent-R1/examples/hotpotqa/run_grpo.sh（b124aa4），按 docs/notes/agent_r1_interfaces.md §8 改为单卡。
+# 注意：veRL 0.7 的 vLLMHttpServer 会用 hf_config.max_position_embeddings 覆盖 rollout.max_model_len
+# （verl/workers/rollout/vllm_rollout/vllm_async_server.py:198），所以用 model.override_config 把它压到 prompt+response，
+# 否则 vLLM 按 Qwen3 默认 40960 预留 KV cache，L4 上放不下。
 # 必需环境变量：RUN_DIR STEPS MODEL RESUME_MODE VERL_FILE_LOGGER_PATH HOTPOTQA_CORPUS_DATA_ROOT
 set -euxo pipefail
 : "${RUN_DIR:?}" "${STEPS:?}" "${MODEL:?}" "${RESUME_MODE:?}" "${VERL_FILE_LOGGER_PATH:?}" "${HOTPOTQA_CORPUS_DATA_ROOT:?}"
@@ -45,7 +48,7 @@ python3 -m agent_r1.trainer.main_agent_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \
-    actor_rollout_ref.rollout.max_model_len=5120 \
+    +actor_rollout_ref.model.override_config.max_position_embeddings=5120 \
     actor_rollout_ref.rollout.n="$ROLLOUT_N" \
     actor_rollout_ref.rollout.calculate_log_probs=True \
     actor_rollout_ref.rollout.agent.agent_flow_config_path="$PROJECT_DIR/recipes/hotpotqa/base.yaml" \
