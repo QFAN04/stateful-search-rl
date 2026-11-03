@@ -19,13 +19,19 @@
 - 步数分布；终止原因（answer / tool_call_unparsed / no_answer_no_tool）；每条轨迹检索次数
 
 ## 结果（跑完填写）
-**2026-11-03 第二次尝试（自动抢占流程，`ssrl-poller` + A100 开机任务）：greedy 已完成，sample 进行中。**
+**2026-11-03 第二次尝试（自动抢占流程，`ssrl-poller` + A100 开机任务）：完成。** `DONE 2026-11-03T14:11:50Z`；汇总 `runs/d2_probe_c0_q3-4b-2507_20261103_1100/probe_summary.json`（`scripts/analyze_probe.py`）。
+- sample（`val_sample/0.jsonl`，300 题 × 8 条，temperature 1.0）：
+  - pass@1 = 0.4304，pass@2 = 0.4737，pass@4 = 0.5072，pass@8 = 0.5333
+  - 8 条全错 46.7%，全对 32.0%，**mixed（有对有错）21.3%**——GRPO 中有非零优势的题约五分之一
+  - 步数分布（2400 条）：1 步 1779、2 步 433、3 步 72、4 步 29、5 步 87；有额外检索的轨迹 25.9%；终止原因 answer 96.0%、tool_call_unparsed 2.9%、no_answer_no_tool 1.1%
+  - 注意：validation 落盘的 `input` 是 prompt+response 拼接解码，分析脚本最初按整段 input 分组，得到错误的"每题 1 条"，已改为按问题文本分组后重算
+- 结论（供用户决定）：C0 起点 EM ≈ 0.43；mixed 21% 表示 RL 有可学空间但不大；约 74% 的轨迹一步作答，**上下文策略只在约 1/4 的轨迹里起作用**。若希望 C0–C3 差异可测，可考虑四组统一关闭 `force_first_search`（第一步必须自己发起检索），代价是改变 recipe 默认行为、需要重跑一次 probe 对比。
+- 时长：A100 三次开机（13:12–13:16、13:24–13:38、13:48–14:12 UTC）后完成；greedy 生成不到 1 分钟，每次开机初始化（Ray / FSDP / vLLM / 4B 加载）约 4 分钟。
 - greedy（`runs/d2_probe_c0_q3-4b-2507_20261103_1100/val_greedy/0.jsonl`，300 题，A100 13:24–13:38 UTC 这次开机跑完并同步）：
   - EM = 0.4367（131/300）
   - 步数分布：1 步 226、2 步 46、3 步 13、4 步 4、5 步 11（约 25% 的轨迹有额外检索，平均每条额外检索 0.45 次）
   - 终止原因：answer 289、tool_call_unparsed 9、no_answer_no_tool 2——与 D1 的 0.6B 不同，4B 几乎没有格式失败
   - 初步含义：4B 有一部分多步检索行为，上下文策略有作用空间，但 3/4 的题一步作答；是否关闭 `force_first_search` 等 sample 结果（pass@k、mixed 比例）出来后再定
-- sample：A100 在 13:38:44 被抢占时正在进行，轮询机自动重试中。
 
 **2026-11-03 第一次尝试（手动）：**
 **2026-11-03 第一次尝试：未完成，无结果数字。** run_id `d2_probe_c0_q3-4b-2507_20261103_1100`（VM 上目录已建，GCS 上无产物）。
