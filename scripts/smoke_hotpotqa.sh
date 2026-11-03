@@ -36,7 +36,8 @@ fi
 mkdir -p "$RUN_DIR"
 
 # 每次启动一个新的 attempt 编号：veRL file logger 以 "w" 打开，复用路径会覆盖旧指标
-ATTEMPT=$(( $(ls "$RUN_DIR"/metrics.attempt*.jsonl 2>/dev/null | wc -l) + 1 ))
+# 注意：不能用 ls glob（无匹配时 ls 非零，pipefail + set -e 会让脚本无声退出）
+ATTEMPT=$(( $(find "$RUN_DIR" -maxdepth 1 -name 'metrics.attempt*.jsonl' | wc -l) + 1 ))
 {
   echo "attempt=$ATTEMPT start=$(date -u +%FT%TZ) resume=$RESUME steps=$STEPS model=$MODEL"
   echo "repo_sha=$(git -C "$REPO" rev-parse HEAD) agent_r1_sha=$(git -C "$REPO/third_party/Agent-R1" rev-parse HEAD)"
