@@ -25,7 +25,14 @@ done
 RUN_DIR="$REPO/runs/$RUN_ID"
 CTR_RUN_DIR="$CTR_REPO/runs/$RUN_ID"
 if [[ $RESUME -eq 1 ]]; then
-  bash "$REPO/scripts/gcp/sync_from_gcs.sh" "$RUN_ID" "$REPO/runs" || true
+  bash "$REPO/scripts/gcp/sync_from_gcs.sh" "$RUN_ID" "$REPO/runs" || echo "WARN: sync_from_gcs 失败，只用本地 checkpoint" >&2
+  # 严格续跑：没有可用 checkpoint 就停，不允许 resume_mode=auto 静默从头训练
+  if [[ ! -s "$RUN_DIR/ckpt/latest_checkpointed_iteration.txt" ]]; then
+    echo "--resume 但找不到 $RUN_DIR/ckpt/latest_checkpointed_iteration.txt，停止。" >&2; exit 2
+  fi
+  LAST=$(cat "$RUN_DIR/ckpt/latest_checkpointed_iteration.txt")
+  [[ -d "$RUN_DIR/ckpt/global_step_$LAST" ]] || { echo "checkpoint 指针指向不存在的 global_step_$LAST，停止。" >&2; exit 2; }
+  (( LAST < STEPS )) || { echo "已完成 $LAST 步 >= 目标 $STEPS，无需续跑。"; exit 0; }
   RESUME_MODE=auto
 else
   if [[ -e "$RUN_DIR/ckpt" ]]; then
@@ -41,12 +48,15 @@ ATTEMPT=$(( $(find "$RUN_DIR" -maxdepth 1 -name 'metrics.attempt*.jsonl' | wc -l
 {
   echo "attempt=$ATTEMPT start=$(date -u +%FT%TZ) resume=$RESUME steps=$STEPS model=$MODEL"
   echo "repo_sha=$(git -C "$REPO" rev-parse HEAD) agent_r1_sha=$(git -C "$REPO/third_party/Agent-R1" rev-parse HEAD)"
+  # repo_sha 不足以还原：VM 上的脚本可能是单独拷贝的，所以同时记录实际运行脚本的哈希和未提交改动
+  echo "dirty=$(git -C "$REPO" status --porcelain | tr '\n' ' ')"
+  sha256sum "$REPO/scripts/smoke_hotpotqa.sh" "$REPO/scripts/smoke_hotpotqa_inner.sh" | sed "s#$REPO/##"
   echo "extra_overrides=$*"
 } >> "$RUN_DIR/meta.txt"
 
 sync_loop() { while sleep "$SYNC_EVERY"; do bash "$REPO/scripts/gcp/sync_to_gcs.sh" "$RUN_ID" "$REPO/runs" >/dev/null 2>&1 || true; done; }
 sync_loop & SYNC_PID=$!
-trap 'kill $SYNC_PID 2>/dev/null || true; bash "$REPO/scripts/gcp/sync_to_gcs.sh" "$RUN_ID" "$REPO/runs" || true' EXIT
+trap 'kill $SYNC_PID 2>/dev/null; wait $SYNC_PID 2>/dev/null; bash "$REPO/scripts/gcp/sync_to_gcs.sh" "$RUN_ID" "$REPO/runs" || echo "ERROR: 最终 GCS 同步失败，本地数据保留在 $RUN_DIR，关机前必须补传" >&2' EXIT
 
 ${DOCKER:-sudo docker} exec \
   -e RUN_DIR="$CTR_RUN_DIR" -e STEPS="$STEPS" -e MODEL="$MODEL" -e RESUME_MODE="$RESUME_MODE" \

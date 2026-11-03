@@ -206,7 +206,7 @@ stateful-search-rl/
 |---|---|---|---|
 | P0 | — | Pre-GRPO probe（C0、C2 两种 prompt） | 必做，D2 |
 | B0 | — | 无检索直接作答（只推理，与 E0 同模型、同答案解析器） | 必做；D2 在 dev-select 上跑，D9 与 E0–E3 一起跑一次封存 test；成本极低 |
-| B1 | — | 单次检索 RAG：用同一检索服务取 top-k（k=3，与训练一致）后一次作答（只推理，同答案解析器） | 必做；D2 在 dev-select 上跑，D9 与 E0–E3 一起跑一次封存 test；成本极低 |
+| B1 | — | 单次检索 RAG：用同一检索服务取 top-k（k=5，与训练所用 recipe 一致）后一次作答（只推理，同答案解析器） | 必做；D2 在 dev-select 上跑，D9 与 E0–E3 一起跑一次封存 test；成本极低 |
 | E0 | C0 append | GRPO 基线 | 必做 |
 | E1 | C1 window | GRPO | 必做 |
 | E2 | C2 curate | GRPO | 必做（核心） |

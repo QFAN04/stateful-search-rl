@@ -39,6 +39,8 @@ flow 的注册：`actor_rollout_ref.rollout.agent.agent_flow_config_path` 指向
 
 结论：recipe 的默认上下文既不是我们的 C0（全量 append），也不是 C1；更接近"问题 + 历史 query + 去重累积的全部 passage"。我们的 C0 必须自己实现，不能直接把 recipe 当 C0。
 
+> **已过时（2026-11-03 用户决定）**：为便于实现，C0 改为直接采用 recipe 默认 flow，预算也沿用 recipe（5 步、一步 ≤4 个并行检索、top-k=5、Hermes 工具调用协议）。以 PLAN §3.1–3.2 和 CLAUDE.md「已定决策」为准；下文 §1.4 示例里的 6 步 / top-k=3 / `<note>` 标签协议不再适用。
+
 ### 1.3 每步样本与 logprob 对应
 
 - 每次 LLM 调用 = 一个 `AgentFlowStep` = 训练 batch 里的一行（`hotpotqa_agent_flow.py:348-394`，`agent_env_loop.py:151-163`）。

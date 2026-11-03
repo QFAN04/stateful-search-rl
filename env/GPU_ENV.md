@@ -10,6 +10,6 @@
 | 初始化 | `scripts/gcp/bootstrap_d1.sh`（可重复执行，按步骤打标记） |
 | 机器 | D1：us-central1-a 按需 g2-standard-16（1×L4 24GB）`ssrl-l4`；正式训练：us-central1 Spot A100 80GB `ssrl-a100`（-c，已建，11-03 两次被抢占）/ Colab（B0/B1、评测、副项目） |
 | 数据 | ModelScope `Melmaphother/Agent-R1-data`：`hotpotqa/`（train / validation / 2wiki / musique parquet）、`hotpotqa_corpus/{hpqa_corpus.jsonl 271MB, index.bin 2.09GB}` |
-| 模型 | Qwen/Qwen3-1.7B snapshot `70d244cc86ccca08cf5af4e1e306ecf908b1ad5e`（D1 冒烟） |
+| 模型 | D1 有效 run 实际用 **Qwen/Qwen3-0.6B**（运行时由 HF 自动下载，snapshot 未记录，D2 起在 meta 中记录）；Qwen/Qwen3-1.7B snapshot `70d244cc86ccca08cf5af4e1e306ecf908b1ad5e` 已下载但在 L4 上 OOM |
 
 规则：镜像或依赖变更必须记录在本文件，并在实验卡中注明。
