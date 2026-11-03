@@ -1,0 +1,34 @@
+# D2 Colab 运行手册：B0/B1 基线 + logprob 一致性
+
+单卡规则：Colab 承担 B0/B1 与评测；A100 上的轮询任务互不影响。两项都只做推理，Colab A100 或 G4 均可（4B bf16 约 8GB）。
+
+## 1. 环境（Colab 单元格）
+```bash
+!git clone https://github.com/QFAN04/stateful-search-rl.git && cd stateful-search-rl && git submodule update --init third_party/Agent-R1
+!pip install -q vllm faiss-cpu FlagEmbedding modelscope pandas pyarrow
+```
+私有仓库：clone 需要 GitHub token（或先在 Colab 里 `from google.colab import auth` 授权后从 `gs://ssrl-runs-gqf-2026/code/repo.bundle` 克隆：`gsutil cp gs://ssrl-runs-gqf-2026/code/repo.bundle . && git clone -b main repo.bundle stateful-search-rl`）。
+
+## 2. 数据
+```bash
+# 固定划分（make_splits.py 产物；data/processed 不进 git）
+!mkdir -p data/processed/hotpotqa_splits && gsutil -m cp gs://ssrl-runs-gqf-2026/data/hotpotqa_splits/dev_select.parquet data/processed/hotpotqa_splits/
+# 检索语料与索引（约 2.3GB）
+!modelscope download --dataset Melmaphother/Agent-R1-data --include "hotpotqa_corpus/hpqa_corpus.jsonl" "hotpotqa_corpus/index.bin" --local_dir /content/agent-r1-data
+```
+核对 `dev_select.parquet` 的题目 ID 与 `data/manifests/hotpotqa_dev_select.json` 一致（ids_sha256）。
+
+## 3. 运行
+```bash
+# 先用 --limit 20 冒烟，确认输出格式与 EM 计算正常，再全量（500 题）
+!python -I scripts/baselines_b0b1.py --split data/processed/hotpotqa_splits/dev_select.parquet \
+    --corpus-dir /content/agent-r1-data/hotpotqa_corpus --out runs/d2_b0b1_dev_q3-4b-2507_<日期>
+!PYTHONPATH=src python -I -m ssrl.checks.logprob_consistency --split data/processed/hotpotqa_splits/dev_select.parquet \
+    --corpus-dir /content/agent-r1-data/hotpotqa_corpus --out runs/d2_logprob_q3-4b-2507_<日期> --n 64
+```
+跑完：`gsutil -m rsync -r runs/<run_id> gs://ssrl-runs-gqf-2026/runs/<run_id>`，然后销毁 Colab 会话。
+
+## 4. 注意
+- B0/B1 只在 dev_select 上跑；封存 test 到 D9 与 E0–E3 一起只跑一次。
+- B1 的检索与 recipe 首次自动检索完全相同（同一检索器类、top-5、问题原文作 query）。
+- 一致性检查只覆盖"推理引擎 vs 训练前向"的数值差异（Agent-R1 直接使用 vLLM 返回的 token ids，不存在重新分词问题，见接口笔记 §1.3）。Colab 的 GPU 型号与 A100 不同，结果需注明硬件；正式训练前可在 A100 上补跑一次。
