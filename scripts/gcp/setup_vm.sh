@@ -3,6 +3,14 @@
 # 在 VM 上运行：bash setup_vm.sh。可重复执行。
 set -euxo pipefail
 
+# Spot 抢占可能打断上一次 apt，先修复包状态和缓存
+sudo dpkg --configure -a || true
+if ! sudo apt-get update -y >/dev/null 2>&1; then
+  sudo rm -rf /var/lib/apt/lists/* /var/cache/apt/*.bin
+  sudo apt-get clean
+  sudo apt-get update -y
+fi
+
 if ! command -v docker >/dev/null; then
   sudo apt-get update -y
   sudo apt-get install -y ca-certificates curl gnupg
