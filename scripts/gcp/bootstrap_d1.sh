@@ -71,5 +71,9 @@ if ! is_done model; then
   done_step model
 fi
 
+# 8. 固定划分（make_splits.py 产物，已上传 GCS）
+mkdir -p ~/data/hotpotqa_splits
+gcloud storage rsync gs://ssrl-runs-gqf-2026/data/hotpotqa_splits ~/data/hotpotqa_splits
+
 nvidia-smi --query-gpu=name,driver_version --format=csv
 echo BOOTSTRAP_DONE
