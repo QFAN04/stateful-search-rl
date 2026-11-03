@@ -19,11 +19,13 @@ CMD=(gcloud compute instances create "$VM_NAME"
   --project="$GCP_PROJECT"
   --zone="$GCP_ZONE"
   --machine-type="$VM_MACHINE"
-  --provisioning-model=SPOT
+  --provisioning-model="${VM_PROVISIONING:-SPOT}"   # SPOT（默认）或 STANDARD（按需，需用户同意）
   --instance-termination-action=STOP
   --max-run-duration="${MAX_HOURS}h"
-  --discard-local-ssds-at-termination-timestamp=true   # a2-ultragpu 自带本地 SSD；只当临时盘用，持久数据在启动盘和 GCS
-  --maintenance-policy=TERMINATE
+  --maintenance-policy=TERMINATE)
+# a2-ultragpu 自带本地 SSD；只当临时盘用，持久数据在启动盘和 GCS
+[[ "$VM_MACHINE" == a2-ultragpu-* ]] && CMD+=(--discard-local-ssds-at-termination-timestamp=true)
+CMD+=(
   --image-family="$VM_IMAGE_FAMILY"
   --image-project="$VM_IMAGE_PROJECT"
   --boot-disk-size="${VM_DISK_GB}GB"

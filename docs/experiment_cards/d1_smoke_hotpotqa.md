@@ -9,7 +9,8 @@
 - 模型 / revision：Qwen/Qwen3-1.7B（`enable_thinking=False`；revision 见 HF cache snapshot，跑后回填）；不行再换 0.6B
 - 数据 split 与 manifest hash：Agent-R1 官方处理的 HotpotQA train.parquet（ModelScope `Melmaphother/Agent-R1-data`）；冒烟不涉及 dev-select / test 划分
 - 关键超参：GRPO，`rollout.n=4`，`train_batch_size=8`（32 条轨迹/步），lr 1e-6 全参，`max_prompt_length=4096`，`max_response_length=1024`，recipe 默认 `max_steps=5`、top-k=5，`gpu_memory_utilization=0.5`，`num_workers=2`，`save_freq=5`，`total_training_steps=10`
-- 硬件 / 预计时长 / 预计费用：GCP us-central1-c Spot a2-ultragpu-1g（1×A100 80GB）；时长与 $/h 跑后实测回填
+- 硬件 / 预计时长 / 预计费用：**GCP us-central1-a 按需 g2-standard-16（1×L4 24GB，16 vCPU，64GB）**，VM `ssrl-l4`。原计划的 us-central1 Spot A100 在 11-03 两次拿到后都在 2 分钟内被抢占，经用户同意 D1 改用按需 L4（D1 只验证环境栈与 recipe 能否跑通，结论与 GPU 型号无关；本 run 的吞吐 / 显存数字不用于 D3 决策）。时长与 $/h 跑后实测回填
+  - 因 L4 只有 24GB：若 1.7B 在 `gpu_memory_utilization=0.5` 下 OOM，先降到 0.4，再换 Qwen3-0.6B（改动记录在结果里）
 - checkpoint 选择规则：不适用（冒烟）
 - 停止规则：任一步报错且 30 分钟内无法定位则停；10 步完成即停。
 
