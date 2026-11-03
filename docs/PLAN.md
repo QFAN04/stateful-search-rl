@@ -121,13 +121,23 @@ flowchart TD
 - 每条 note 必须带来源 `doc_id`，方便评估幻觉。
 - 预算：最多 4 次 search，最多 6 步，单步输出 ≤ 512 token。超预算则强制结束，奖励为 0，并记录 `truncated`。
 
+> **2026-11-03 修订（以更容易实现为准，用户已确认）**：读完 Agent-R1 源码（`docs/notes/agent_r1_interfaces.md`）后，动作协议和预算**直接沿用 HotpotQA recipe 的默认值**，不再按上面的原始设定改造：
+> - 协议用 recipe 的 `<analysis>` + Hermes `<tool_call>` JSON + `<answer>`；C2 的笔记作为额外的 `note` 工具调用（参数为 1–3 条带 `doc_id` 的事实），其他三组不启用该工具。
+> - 预算用 recipe 默认：`max_steps=5`、一步最多 4 个并行检索、检索 top-k=5、`force_first_search=true`、单步输出 ≤1024 token。四组完全一致。
+> - 奖励用 recipe 的 EM（SQuAD 式归一化 + 别名匹配）；非终局步奖励必须显式给 0.0。
+> - loss 沿用框架默认的按步聚合（步数多的轨迹权重更大）。不改框架，而是记录每组的步数分布，在报告中作为混杂因素说明。
+
 ### 3.2 四种上下文策略（核心实现，约 150–250 行加单元测试）
 | 策略 | 第 t 步 observation | 要点 |
 |---|---|---|
-| C0 append | 问题 + 全部历史动作 + 全部历史文档 | 原版基线 |
+| C0 append | 问题 + 全部历史 query + 全部历史文档（去重累积）。**即 recipe 的默认 flow，不再自己实现"全部历史动作"版**；模型自己写的 `<analysis>` 不带到下一步 | 原版基线（直接用 recipe） |
 | C1 window | 问题 + 最近 k 步的动作和文档（k 让平均 token 与 C2 接近） | 区分"少看点就行"和"学会提炼" |
 | C2 curate | 问题 + 累积 notes + 历史 search query 列表 + **仅本轮**文档 | notes 是 policy 动作，被 RL 直接优化 |
 | C3 rule | 问题 + 规则抽取的高重叠句子 + 历史 query + 本轮文档 | 不靠学习的压缩对照 |
+
+**实现方式**：在 `src/ssrl/env_search.py` 以 recipe 的 `HotpotQAAgentFlow` 为模板写一个 `AgentFlowBase` 子类，C0–C3 只是同一个 flow 里替换"每步 prompt 怎么渲染"这一个函数（挂载点见接口笔记 §1.4），不改上游代码。
+
+**与 Agent-R1 技术报告的关系**：该报告已在 GSM8K 上比较过 append / sliding-window / LLM 摘要三种上下文策略。我们的差异写进报告：多跳检索任务（不是单轮数学）、C2 笔记是被 RL 直接优化的动作并评估其质量、C3 规则压缩对照、准确率–token 帕累托分析。
 
 **公平性原则**：
 - C0–C3 共用同一模型、数据、G、步数、检索 top-k 和最大轮数，奖励只有 EM。
@@ -210,12 +220,15 @@ stateful-search-rl/
 - G=8，每步 64–128 个 prompt，lr 1e-6（全参）或 1e-5（LoRA），KL 0.001，150–200 步，最大上下文 8k。
 
 **全参还是 LoRA**：D3 实测，在 2×A100-80G 上全参单步时间可接受就用全参，否则用 LoRA rank 64。**四组必须一致**。
+- **已定（2026-11-03）**：D3 时若 GCP 扩容仍未批下，整个实验矩阵锁定 LoRA；之后即使有了多卡也不改成全参，多出来的卡只用于并行跑组和补 seed（E4/E5）。
+
+**单卡期间规则**（`GPUS_ALL_REGIONS=1`）：同一时间只能有一张 GPU（L4 也算）。E0–E3 全部在同一台 GCP us-central1 Spot A100 80GB 上串行跑，不用 Colab 凑并行，保证四组硬件一致；Colab 只承担主项目的 B0/B1、评测，以及副项目。Spot 被抢占或无资源时先告知用户，不自动换区域或换按需实例。
 
 ---
 
 ## 8. 14 天时间线（与副项目并行）
 
-> 前提：GCP 配额到位前，D1–D3 在 Colab A100/G4 单卡上做开发。
+> 前提（2026-11-03 更新）：扩容前 D1–D3 的开发和实测都在 GCP us-central1 的单张 Spot A100 80GB 上做（与后续正式训练同一硬件）；Colab 只承担 B0/B1、评测和副项目。
 
 | 天 | 主项目任务 | 验收（未达标不往下走） |
 |---|---|---|
@@ -239,9 +252,9 @@ stateful-search-rl/
 
 | 资源 | 用途 | 备注 |
 |---|---|---|
-| GCP A100 80GB × 2–4（优先 Spot） | E0–E5 正式训练 | Spot 价格约为按需的 30–40%，但会被抢占，所以每 10–20 步存一次 checkpoint，并写好 `resume` 脚本 |
+| GCP A100 80GB × 2–4（优先 Spot；扩容前只有 us-central1 Spot × 1，见 §7 单卡期间规则） | E0–E5 正式训练 | Spot 价格约为按需的 30–40%，但会被抢占，所以每 10–20 步存一次 checkpoint，并写好 `resume` 脚本 |
 | GCP 高内存 CPU VM（或训练机本身） | 检索服务 | 稠密索引需要大内存（几十 GB 量级），BM25 小得多。D1 实测后定 |
-| Colab A100 / G4（本机 Colab CLI，单会话最长约 12 小时） | D1–D3 开发、probe；GCP 不足时承担中等长度训练 | 跑完同步结果后**销毁会话** |
+| Colab A100 / G4（本机 Colab CLI，单会话最长约 12 小时） | 单卡期间只承担 B0/B1、评测和副项目；不用于 E0–E3 正式训练 | 跑完同步结果后**销毁会话** |
 | TC2 A40 | 候补：评测、补跑（需连学校网络） | 单作业 6 小时上限，按 5h15 收尾 |
 
 **所有脚本的硬性规范**（适用于 GCP Spot、Colab、TC2）：
@@ -284,7 +297,7 @@ stateful-search-rl/
 | Agent-R1 新版的坑 | D1 go/no-go；退路是 Search-R1 |
 | 4B 不按 curate 格式输出 | 先用 few-shot prompt；仍不行就四组同源轻量 SFT（DeepSeek 教师，约 300–500 条，只保留答对的） |
 | curate 笔记丢失关键信息 | 保留历史 query 列表，允许重新搜索；用 C3 做对照 |
-| GCP 配额被拒或延迟 | Colab A100 单卡跑 LoRA 版本，缩小训练集和步数，并如实报告 |
+| GCP 配额被拒或延迟 | 在现有 1 张 Spot A100 上串行跑四组，D3 起锁定 LoRA；必要时缩小训练集和步数，并如实报告 |
 | 全对 / 全错组太多 | 按 probe 结果筛训练题难度；有 DAPO 动态采样就开，不当成创新点 |
 | Spot 被抢占 | 频繁存 checkpoint；`test_resume.py` 验证恢复后指标连续 |
 | 结果不显著 | 报告置信区间和负结果，把重点放在机制分析上 |
