@@ -23,7 +23,21 @@
 Go：1+2 满足（3 不满足则记为待修问题，不阻塞 D2）。No-Go：1 或 2 当天无法满足 → 按 CLAUDE.md 切换 Search-R1。
 
 ## 结果（跑完填写）
-- 实际时长 / 费用：
-- 主指标（附日志路径）：
+有效 run：`d1_smoke_hotpotqa_q3-0p6b_20261103_0956`（`gs://ssrl-runs-gqf-2026/runs/d1_smoke_hotpotqa_q3-0p6b_20261103_0956/`）。代码 commit `76183656`，模型 **Qwen/Qwen3-0.6B**，额外覆盖 `ppo_micro_batch_size_per_gpu=1`（见 meta.txt）。
+
+- 实际时长 / 费用：训练 10 步 8 分 32 秒（attempt1，09:56–10:07 UTC），续跑 2 步（attempt2，10:20 起）。`ssrl-l4` 开机 08:10:44–10:27:57 UTC（约 2 小时 17 分，其中约 1 小时因启动脚本 bug 空转，见下）。`ssrl-a100` 两次 Spot 合计开机约 3 分钟。$/h 以 GCP 账单回填。
+- 主指标（来自 `metrics.attempt{1,2}.jsonl`、`replay_check.txt`）：
+  - Go 判据 1：10 步完成，`latest_checkpointed_iteration.txt` = 10（global_step_5 / 10 已存）。✅
+  - Go 判据 2：`scripts/check_replay.py` 回放 10 个 rollout 文件共 320 条轨迹，`unreplayable=0`，每步 input / output 完整。✅
+  - Go 判据 3：`--resume` 启动，日志 `Load from checkpoint folder: .../global_step_10`，指标只有 step 11、12，最终 checkpoint 12。✅
+  - 判据 4（仅记录）：`training/rollout_probs_diff_mean` 12 步范围 0.0062–0.0071；`rollout_probs_diff_max` 0.108–0.547。
+  - 单步耗时：第 1 步 69.9 s，第 2–12 步平均 46.3 s（L4、0.6B、32 条轨迹/步）；`perf/max_memory_allocated_gb` 峰值 17.9。
+  - 行为：轨迹几乎都是 1 步（每个 rollout 文件 30–32 条 / 32 条为 1 步），每步平均得分 0.000–0.219（replay_check.txt）。原因：recipe `force_first_search=true` 在第 1 步前用问题原文自动检索一次（不计步），0.6B 随即直接作答。
 - 异常 / 中断 / resume 记录：
-- 结论与下一步：
+  1. 首次启动（1.7B，`d1_smoke_hotpotqa_q3-1p7b_20261103_0839`）：`smoke_hotpotqa.sh` 的 attempt 计数用 `ls glob | wc -l`，无匹配时在 `pipefail + set -e` 下无声退出，训练未启动；监控用 `pgrep -f` 匹配到自身 ssh 命令，误报 ALIVE，约 1 小时后才发现。已改用 `find` 计数、监控改用 `grep '[m]ain_agent_ppo'`。
+  2. vLLM KV cache 不足：veRL 0.7 `vLLMHttpServer` 用 `hf_config.max_position_embeddings`（Qwen3 为 40960）覆盖 `rollout.max_model_len`（`vllm_async_server.py:198`）。改为 `+actor_rollout_ref.model.override_config.max_position_embeddings=5120`。4B / A100 上同样需要。
+  3. 1.7B 全参在 L4 上 actor 更新 OOM（rollout 已跑通）→ 按预案换 0.6B + micro batch 1。
+  4. 训练结束后的清理阶段出现 `DataLoader worker ... killed by signal: Killed`（10/10 之后），dmesg 无 OOM 记录，不影响结果。
+- 结论与下一步：**Go**。Agent-R1 + veRL 0.7 栈、recipe、轨迹回放、checkpoint 续跑在单卡上可用。下一步（D2）：
+  - 4B probe（C0 prompt）重点看**步数分布**：若 4B 也几乎一步作答，C0–C3 的上下文策略没有作用空间，需要四组统一关闭 `force_first_search` 和 / 或在 prompt 中要求先检索（属于实验设计变更，需用户确认）。
+  - 4B 在单卡上的显存：1.7B 全参在 24GB 上已 OOM；4B 必须在 A100 80GB 上跑，并保留 `max_position_embeddings` 覆盖。
