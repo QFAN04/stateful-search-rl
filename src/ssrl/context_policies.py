@@ -88,10 +88,8 @@ class TrajState:
 # ---------------------------------------------------------------------------
 
 
-def format_passages(entries: list[tuple[int, str, str]], max_chars: int = 0) -> str:
-    """entries: (编号, query, 文本)。max_chars>0 时超出部分截断。"""
-    if not entries:
-        return "None"
+def _passage_lines(entries: list[tuple[int, str, str]], max_chars: int) -> tuple[list[str], int]:
+    """返回 (输出行, 实际展示的条数)。max_chars>0 时超出部分截断。"""
     lines: list[str] = []
     total = 0
     for i, (label, query, text) in enumerate(entries, start=1):
@@ -99,10 +97,17 @@ def format_passages(entries: list[tuple[int, str, str]], max_chars: int = 0) -> 
         line = f"[{label}] (query: {query}) {snippet}"
         if max_chars > 0 and total + len(line) > max_chars:
             lines.append(f"... ({len(entries) - i + 1} more passages truncated)")
-            break
+            return lines, i - 1
         lines.append(line)
         total += len(line)
-    return "\n".join(lines)
+    return lines, len(entries)
+
+
+def format_passages(entries: list[tuple[int, str, str]], max_chars: int = 0) -> str:
+    """entries: (编号, query, 文本)。"""
+    if not entries:
+        return "None"
+    return "\n".join(_passage_lines(entries, max_chars)[0])
 
 
 def format_actions(actions: list[str]) -> str:
@@ -229,6 +234,13 @@ def shown_passage_ids(cfg: PolicyConfig, state: TrajState) -> list[int]:
             ids += [i for i in r if i not in ids]
         return ids
     return list(state.round_passages[-1]) if state.round_passages else []
+
+
+def visible_passage_ids(cfg: PolicyConfig, state: TrajState, max_chars: int) -> list[int]:
+    """按与 render 相同的 max_chars 截断后，Retrieved Passages 段里真正出现的文档（0 起编号）。
+    C2 的 note 只能引用这些文档。"""
+    shown = shown_passage_ids(cfg, state)
+    return shown[: _passage_lines(_entries(state, shown), max_chars)[1]]
 
 
 def render(cfg: PolicyConfig, state: TrajState, tool_feedback: str, max_chars: int) -> str:

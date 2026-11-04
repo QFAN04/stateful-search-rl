@@ -28,7 +28,7 @@ from ssrl.context_policies import (
     TrajState,
     parse_note,
     render,
-    shown_passage_ids,
+    visible_passage_ids,
     tool_schemas,
 )
 
@@ -93,8 +93,9 @@ class SSRLSearchFlow(SSRLHotpotQAFlow):
             logger.warning("[ssrl_search] search failed for %d queries: %s", len(queries), e)
         st.add_round(queries, texts)
 
-    async def _prompt_ids(self, st: TrajState, fb_text: str, num_step: int) -> list[int]:
-        """与 recipe _prompt_ids_within_budget 相同：只收缩文档段，绝不截掉开头的工具定义。"""
+    async def _prompt_ids(self, st: TrajState, fb_text: str, num_step: int) -> tuple[list[int], int]:
+        """与 recipe _prompt_ids_within_budget 相同：只收缩文档段，绝不截掉开头的工具定义。
+        同时返回最终使用的文档字符预算，用来确定本步真正展示了哪些文档（C2 笔记只能引用这些）。"""
         max_chars, min_chars = self.prompt_length * 3, 400
         while True:
             messages = [
@@ -107,7 +108,7 @@ class SSRLSearchFlow(SSRLHotpotQAFlow):
             max_chars = max(min_chars, int(max_chars * 0.72))
         if len(ids) > self.prompt_length:
             logger.warning("[ssrl_search][step=%d] prompt still too long (%d > %d)", num_step, len(ids), self.prompt_length)
-        return ids[: self.prompt_length]
+        return ids[: self.prompt_length], max_chars
 
     def _extra(self, st: TrajState, anchor_obs: str, n_prompt: int, acc: float = 0.0) -> dict[str, Any]:
         return {
@@ -138,8 +139,8 @@ class SSRLSearchFlow(SSRLHotpotQAFlow):
             num_steps += 1
             fb_text = "\n".join(fb_lines[-3:]) if (fb_lines and self.enable_tool_parse_feedback) else ""
             anchor_obs = render(cfg, st, fb_text, self.prompt_length * 3)
-            allowed_sources = {i + 1 for i in shown_passage_ids(cfg, st)}
-            prompt_ids = await self._prompt_ids(st, fb_text, num_steps)
+            prompt_ids, used_chars = await self._prompt_ids(st, fb_text, num_steps)
+            allowed_sources = {i + 1 for i in visible_passage_ids(cfg, st, used_chars)}
 
             with simple_timer("generate_sequences", metrics):
                 output = await self.server_manager.generate(

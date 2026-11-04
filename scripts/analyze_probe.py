@@ -12,8 +12,9 @@ import pathlib
 import re
 import sys
 
-SEARCH_RE = re.compile(r'"name"\s*:\s*"search"')
-NOTE_RE = re.compile(r'"name"\s*:\s*"note"')
+# 单引号也算：上游 _recover_tool_calls_from_text 会恢复 Python 字面量形式的调用（D2 数据中没有出现过）
+SEARCH_RE = re.compile(r"""["']name["']\s*:\s*["']search["']""")
+NOTE_RE = re.compile(r"""["']name["']\s*:\s*["']note["']""")
 QUERY_RE = re.compile(r"### User Query\n(.*?)\n\n### History", re.DOTALL)
 
 

@@ -19,6 +19,7 @@ from ssrl.context_policies import (
     render,
     shown_passage_ids,
     tool_schemas,
+    visible_passage_ids,
 )
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -184,6 +185,17 @@ def test_truncation_only_cuts_passages(policy):
     short = render(PolicyConfig(policy), st, "", 60)
     assert "more passages truncated" in short and len(short) < len(full)
     assert short.split("### Retrieved Passages")[0] == full.split("### Retrieved Passages")[0]
+
+
+def test_visible_ids_follow_truncation():
+    """C2 笔记只能引用真正出现在 prompt 里的文档：被字符预算截掉的不算。"""
+    st = _state()
+    cfg = PolicyConfig("c2")
+    assert visible_passage_ids(cfg, st, 0) == shown_passage_ids(cfg, st) == [4, 3]
+    out = render(cfg, st, "", 80)  # 只放得下第一篇
+    assert "[5] (query: Blue Moon band)" in out and "[4] (query:" not in out
+    assert visible_passage_ids(cfg, st, 80) == [4]
+    assert visible_passage_ids(cfg, st, 10) == []
 
 
 def test_tool_schemas():
