@@ -80,9 +80,16 @@ if torch.cuda.is_available():
 EOF
 pip list > "$DATA/pip-list-autodl.txt"
 
+# AutoDL 文件存储（同一地区的实例共享，西北B）里有缓存就直接拷，没有才从 ModelScope 下载（实测 2–3MB/s）
+FS_CACHE=/root/autodl-fs/ssrl-data
+from_cache() {  # from_cache <缓存内相对路径> <目标目录>
+  [[ -d "$FS_CACHE/$1" ]] || return 1
+  mkdir -p "$2" && cp -a "$FS_CACHE/$1/." "$2/" && echo "copied $1 from $FS_CACHE"
+}
+
 # 5. 数据：HotpotQA parquet + 检索语料与索引（ModelScope，境内直连）
 if ! data_is_done data; then
-  modelscope download --dataset Melmaphother/Agent-R1-data \
+  from_cache agent-r1-data "$DATA/agent-r1-data" || modelscope download --dataset Melmaphother/Agent-R1-data \
     --include "hotpotqa/*" "hotpotqa_corpus/hpqa_corpus.jsonl" "hotpotqa_corpus/index.bin" \
     --local_dir "$DATA/agent-r1-data"
   ls -la "$DATA/agent-r1-data/hotpotqa" "$DATA/agent-r1-data/hotpotqa_corpus"
@@ -93,12 +100,12 @@ ln -sfn "$DATA/agent-r1-data/hotpotqa" "$REPO/third_party/Agent-R1/data/corpus/h
 
 # 6. 模型（ModelScope 下载到数据盘；训练时用本地路径）
 if ! data_is_done model06; then
-  modelscope download --model Qwen/Qwen3-0.6B --local_dir "$DATA/models/Qwen3-0.6B"
+  from_cache models/Qwen3-0.6B "$DATA/models/Qwen3-0.6B" || modelscope download --model Qwen/Qwen3-0.6B --local_dir "$DATA/models/Qwen3-0.6B"
   data_done_step model06
 fi
 # 检索编码器（recipe 默认 BAAI/bge-large-en-v1.5；运行时用 HOTPOTQA_EMBEDDING_MODEL 指向本地目录）
 if ! data_is_done bge; then
-  modelscope download --model BAAI/bge-large-en-v1.5 --local_dir "$DATA/models/bge-large-en-v1.5"
+  from_cache models/bge-large-en-v1.5 "$DATA/models/bge-large-en-v1.5" || modelscope download --model BAAI/bge-large-en-v1.5 --local_dir "$DATA/models/bge-large-en-v1.5"
   data_done_step bge
 fi
 

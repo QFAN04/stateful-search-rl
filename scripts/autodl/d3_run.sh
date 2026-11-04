@@ -40,7 +40,8 @@ stage_prep() {
   python scripts/autodl/clean_stale_site_packages.py || return 1   # 私有镜像的旧文件残留，见脚本说明
   if [[ ! -f "$DATA/.ssrl_setup_marks/model4b" ]]; then
     log "download Qwen3-4B-Instruct-2507"
-    modelscope download --model Qwen/Qwen3-4B-Instruct-2507 --local_dir "$M4B" && touch "$DATA/.ssrl_setup_marks/model4b" || return 1
+    { [[ -d /root/autodl-fs/ssrl-data/models/Qwen3-4B-Instruct-2507 ]] && mkdir -p "$M4B" && cp -a /root/autodl-fs/ssrl-data/models/Qwen3-4B-Instruct-2507/. "$M4B/"; } \
+      || modelscope download --model Qwen/Qwen3-4B-Instruct-2507 --local_dir "$M4B" && touch "$DATA/.ssrl_setup_marks/model4b" || return 1
   fi
   for f in probe.parquet probe_x8.parquet dev_select.parquet; do
     [[ -s "$SPLITS_DIR/$f" ]] || { log "missing $SPLITS_DIR/$f（从本地 data/processed/hotpotqa_splits 上传）"; return 1; }
