@@ -24,6 +24,8 @@ export VERL_FILE_LOGGER_PATH="$RUN_DIR/metrics.attempt$ATTEMPT.jsonl"
 {
   echo "attempt=$ATTEMPT start=$(date -u +%FT%TZ) steps=$STEPS model=$MODEL lora_rank=${LORA_RANK:-32} lora_alpha=${LORA_ALPHA:-32} lr=${LR:-1e-5}"
   echo "platform=autodl gpu=$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader | head -1) n_gpu=$(nvidia-smi -L | wc -l)"
+  echo "flow_config=${FLOW_CONFIG:-recipe} flow_name=${FLOW_NAME:-hotpotqa_agent} n_gpus=${N_GPUS:-1} train_batch=${TRAIN_BATCH:-8} rollout_n=${ROLLOUT_N:-4} max_prompt=${MAX_PROMPT:-4096} max_response=${MAX_RESPONSE:-1024} micro_bs=${MICRO_BS:-2} offload=${OFFLOAD:-True} gpu_mem_util=${GPU_MEM_UTIL:-0.5} agent_workers=${AGENT_WORKERS:-2} save_freq=${SAVE_FREQ:-5}"
+  echo "repo_sha=$(git -C "$REPO" rev-parse HEAD 2>/dev/null || echo unknown) dirty=$(git -C "$REPO" status --porcelain 2>/dev/null | tr '\n' ' ')"
   echo "extra_overrides=$*"
   sha256sum "$REPO/scripts/autodl/smoke_lora.sh" "$REPO/scripts/smoke_hotpotqa_inner.sh" | sed "s#$REPO/##"
 } >> "$RUN_DIR/meta.txt"

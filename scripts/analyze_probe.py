@@ -13,6 +13,7 @@ import re
 import sys
 
 SEARCH_RE = re.compile(r'"name"\s*:\s*"search"')
+NOTE_RE = re.compile(r'"name"\s*:\s*"note"')
 QUERY_RE = re.compile(r"### User Query\n(.*?)\n\n### History", re.DOTALL)
 
 
@@ -51,6 +52,12 @@ def behavior(trajs: list[dict], ffs: bool) -> dict:
         "frac_traj_with_extra_search": round(sum(s > 0 for s in searches) / n, 3),
         "retrieval_rounds": dict(sorted(collections.Counter(rounds).items())),
         "frac_multi_round": round(sum(r >= 2 for r in rounds) / n, 3),
+        # 上下文长度：每步 prompt 的字符数（input 含 response，减去 output 长度）；用于 C1 的 k 与 C2 对齐
+        "prompt_chars_per_step_mean": round(
+            sum(len(s["input"]) - len(s["output"]) for t in trajs for s in t["steps"])
+            / sum(len(t["steps"]) for t in trajs), 1),
+        # C2：至少有一次 note 调用的轨迹比例（其他策略应为 0）
+        "frac_traj_with_note": round(sum(any(NOTE_RE.search(s["output"]) for s in t["steps"]) for t in trajs) / n, 3),
     }
 
 
@@ -65,6 +72,10 @@ def main() -> None:
     g = load(run / "val_greedy")
     out["greedy"] = {"em": round(sum(t["score"] > 0 for t in g) / len(g), 4), **behavior(g, ffs)}
 
+    if not (run / "val_sample").exists():  # D3 的策略 probe 只跑 greedy
+        print(json.dumps(out, indent=1, ensure_ascii=False))
+        (run / "probe_summary.json").write_text(json.dumps(out, indent=1, ensure_ascii=False))
+        return
     s = load(run / "val_sample")
     groups = collections.defaultdict(list)
     for t in s:
