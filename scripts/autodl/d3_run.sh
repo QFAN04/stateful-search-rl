@@ -63,7 +63,7 @@ stage_smoke() {
     local id="d3_smoke_${p}_q3-0p6b_lora_$TAG"
     done_mark "$id" && { log "skip $id"; continue; }
     log "smoke $p"
-    if MODEL="$M06" SAVE_FREQ=100 train "$id" 3 "$p" && python scripts/check_replay.py "runs/$id/rollouts" \
+    if MODEL="$M06" SAVE_FREQ=-1 train "$id" 3 "$p" && python scripts/check_replay.py "runs/$id/rollouts" \
         --expect-steps 3 --expect-trajs 32 > "runs/$id/replay_check.txt" 2>&1; then
       mark "$id"
     else
@@ -126,7 +126,7 @@ stage_tput() {
     local pid; pid=$(gpu_peak "$id")
     if MODEL="$M4B" TRAIN_BATCH="${TRAIN_BATCH:-64}" ROLLOUT_N="${ROLLOUT_N:-8}" MAX_PROMPT=8192 MAX_RESPONSE=1024 \
         MICRO_BS="${MICRO_BS:-4}" OFFLOAD="${OFFLOAD:-False}" GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.5}" \
-        AGENT_WORKERS="${AGENT_WORKERS:-8}" SAVE_FREQ=100 train "$id" 3 "$p"; then
+        AGENT_WORKERS="${AGENT_WORKERS:-8}" SAVE_FREQ=-1 train "$id" 3 "$p"; then
       mark "$id"
     else
       log "tput $p FAILED"; rc=1
