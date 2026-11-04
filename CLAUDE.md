@@ -14,6 +14,7 @@
 - 数据：HotpotQA train 子集；dev-select 500（选 checkpoint）；test 1000（封存）；OOD：MuSiQue 500、2Wiki 500。
 - 对照：C0 append / C1 sliding window / C2 模型自写证据笔记 / C3 规则压缩。奖励只用 EM。四组超参、步数、G、检索 top-k、最大轮数一致；如需 SFT，四组同源同规模。
 - **以 recipe 默认为准（2026-11-03）**：动作协议、预算（5 步、一步 ≤4 个并行检索、top-k=5、单步 ≤1024 token）、EM 奖励都沿用 Agent-R1 HotpotQA recipe；C0 = recipe 默认 flow；C1–C3 只替换每步 prompt 的渲染函数（自写 `AgentFlowBase` 子类，不改上游）；C2 笔记是额外的 `note` 工具。loss 按步聚合不改，步数分布作为混杂因素报告。详见 PLAN §3.1–3.2。
+- **环境配置保持 recipe 默认（2026-11-04）**：`force_first_search=true`、top-k=5，E0–E3 统一。预实验中 FFS-off / top-k=3 都没达标（见 `docs/experiment_cards/d2_env_probe.md`）。4B 约 25% 轨迹为多轮检索，主实验分析按检索轮数分层，报告中说明上下文策略的作用范围。
 - 全参还是 LoRA：D3 实测吞吐后决定，四组必须一致。**D3 时若 GCP 扩容仍未批下，整个实验矩阵锁定 LoRA**；之后即使有了多卡也不改成全参，多出来的卡只用于并行跑组和补 seed。
 - **单卡期间规则**（`GPUS_ALL_REGIONS=1`，2026-11-03 起）：同一时间只能有一张 GPU 在跑（L4 也算在内）。主项目四组正式实验（E0–E3）全部在同一台 GCP us-central1 Spot A100 80GB 上串行跑，不用 Colab 凑并行；Colab 只用于主项目的 B0/B1 和评测，以及副项目。Spot 被抢占或无资源时先告知用户，不自动换区域或换按需实例。
 
