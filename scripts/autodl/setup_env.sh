@@ -105,7 +105,7 @@ if ! data_is_done model06; then
 fi
 # 检索编码器（recipe 默认 BAAI/bge-large-en-v1.5；运行时用 HOTPOTQA_EMBEDDING_MODEL 指向本地目录）
 if ! data_is_done bge; then
-  from_cache models/bge-large-en-v1.5 "$DATA/models/bge-large-en-v1.5" || modelscope download --model BAAI/bge-large-en-v1.5 --local_dir "$DATA/models/bge-large-en-v1.5"
+  from_cache models/bge-large-en-v1.5 "$DATA/models/bge-large-en-v1.5" || modelscope download --model BAAI/bge-large-en-v1.5 --exclude "*.bin" "*.onnx" "onnx/*" --local_dir "$DATA/models/bge-large-en-v1.5"
   data_done_step bge
 fi
 
