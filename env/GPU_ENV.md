@@ -13,3 +13,8 @@
 | 模型 | D1 有效 run 实际用 **Qwen/Qwen3-0.6B**（运行时由 HF 自动下载，snapshot 未记录，D2 起在 meta 中记录）；Qwen/Qwen3-1.7B snapshot `70d244cc86ccca08cf5af4e1e306ecf908b1ad5e` 已下载但在 L4 上 OOM |
 
 规则：镜像或依赖变更必须记录在本文件，并在实验卡中注明。
+
+## AutoDL（2026-11-04 起，E0–E3 平台）
+- 不用 Docker：官方基础镜像 PyTorch 2.8 / Python 3.12 / CUDA 12.8（Ubuntu 22.04）上运行 `scripts/autodl/setup_env.sh`，装进 conda base，版本与上表训练镜像相同（torch 2.9.0+cu129、vLLM 0.12.0、verl 0.7.0、transformers 4.57.3、ray 2.52.1、flash-attn 2.8.1），其余按 `env/autodl/constraints.txt`。唯一差别：opencv-python-headless 不锁版本（见 `docs/experiment_cards/d3_autodl_envtest.md`）。
+- 数据和模型从 ModelScope 下载到数据盘 `/root/autodl-tmp/data`（数据集同上；Qwen/Qwen3-0.6B；BAAI/bge-large-en-v1.5 只取 safetensors）。
+- 已验证：RTX 5090（Blackwell，sm_120，驱动 595.71.05）0.6B LoRA 冒烟（`d3_autodl_envtest_q3-0p6b_lora_5090_20261104`）。环境装好后关机保存为私有镜像复用。
