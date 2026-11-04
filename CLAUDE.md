@@ -5,7 +5,7 @@
 - **新会话先读 `docs/HANDOFF.md`**（规划会话的决策理由、已否决的方案、待办清单）。
 - 完整计划：`docs/PLAN.md`（v3，2026-11-02 定稿）。与本文件冲突时以本文件「已定决策」为准。
 - 姊妹项目：`D:/AI-Projects/agentic-verifier-code`（副项目，并行两周）。
-- 当前状态：**规划完成，尚未运行任何实验。**
+- 当前状态：**D1、D2 完成（见 `docs/PROGRESS.md`）；下一步 D3：AutoDL 环境测试 + C1–C3 实现。**
 
 ## 已定决策（变更需用户确认）
 - 底座：**Agent-R1（基于 veRL 0.7.0，step-level MDP）**，作为 git submodule 放在 `third_party/`，固定 SHA。
@@ -15,8 +15,13 @@
 - 对照：C0 append / C1 sliding window / C2 模型自写证据笔记 / C3 规则压缩。奖励只用 EM。四组超参、步数、G、检索 top-k、最大轮数一致；如需 SFT，四组同源同规模。
 - **以 recipe 默认为准（2026-11-03）**：动作协议、预算（5 步、一步 ≤4 个并行检索、top-k=5、单步 ≤1024 token）、EM 奖励都沿用 Agent-R1 HotpotQA recipe；C0 = recipe 默认 flow；C1–C3 只替换每步 prompt 的渲染函数（自写 `AgentFlowBase` 子类，不改上游）；C2 笔记是额外的 `note` 工具。loss 按步聚合不改，步数分布作为混杂因素报告。详见 PLAN §3.1–3.2。
 - **环境配置保持 recipe 默认（2026-11-04）**：`force_first_search=true`、top-k=5，E0–E3 统一。预实验中 FFS-off / top-k=3 都没达标（见 `docs/experiment_cards/d2_env_probe.md`）。4B 约 25% 轨迹为多轮检索，主实验分析按检索轮数分层，报告中说明上下文策略的作用范围。
-- 全参还是 LoRA：D3 实测吞吐后决定，四组必须一致。**D3 时若 GCP 扩容仍未批下，整个实验矩阵锁定 LoRA**；之后即使有了多卡也不改成全参，多出来的卡只用于并行跑组和补 seed。
-- **单卡期间规则**（`GPUS_ALL_REGIONS=1`，2026-11-03 起）：同一时间只能有一张 GPU 在跑（L4 也算在内）。主项目四组正式实验（E0–E3）全部在同一台 GCP us-central1 Spot A100 80GB 上串行跑，不用 Colab 凑并行；Colab 只用于主项目的 B0/B1 和评测，以及副项目。Spot 被抢占或无资源时先告知用户，不自动换区域或换按需实例。
+- **训练方式锁定 LoRA（2026-11-04 用户确认）**：整个实验矩阵（E0–E5）都用 LoRA，之后即使有了更多或更大的卡也不改成全参。理由：4B 全参需要 80GB 卡加多卡分片，花费约为 LoRA 的 2–3 倍；RL 的信号稀疏，LoRA 足够；四组同为 LoRA，组间比较仍然公平。LoRA 超参（rank、alpha、作用层、lr）只定一次，四组统一；如需试调，只用 C0 跑短程，并在报告中说明。
+- **算力平台改为 AutoDL（2026-11-04 用户确认）**，取代原"单卡期间规则"（GCP `GPUS_ALL_REGIONS=1`）：
+  - E0–E3 必须在**同一平台、同一 GPU 型号、同一环境（私有镜像）、同一卡数**上跑完，不跨平台或混用型号；允许多卡。
+  - 卡型在 D3 环境测试后定，倾向 RTX PRO 6000 96GB（Pro 实例，可用 `autodl` CLI 自动创建）；不用 4090-48G / 3090-48G 等改装显存的消费卡跑正式实验。
+  - 正式训练前必须通过迁移验收（`docs/notes/compute_fallback.md` §6：0.6B 冒烟 + 严格回放、C0 greedy EM 与 0.4367 相差 ≤ 约 2pp、logprob 一致性同量级），通过后 D2 的基线和 probe 结论可以沿用。
+  - 每个实例都设 `--ttl` 自动关机；创建多卡实例或单次预计花费超过 ¥20 前，先向用户确认。
+  - Colab 仍只用于主项目的 B0/B1 和评测，以及副项目；GCP 保留桶和现有脚本，GCP 配额若批下也不再用于 E0–E3（避免四组跨平台）。
 
 ## 关键模块（★ = 用户必须亲自读懂）
 - ★ `src/ssrl/context_policies.py`：C0–C3 的 observation 构造
@@ -47,7 +52,7 @@ D1 环境 + Go/No-Go → D2 probe + 一致性检查 → D3 策略实现 + 单测
 - 每个工作日结束时，在 `docs/PROGRESS.md` 追加一行：`日期 | 第几个工作日 | 可见产出（附 run_id 或文件路径）| 卡点 | 明天计划`。用户随时问"今天的可见产出是什么"，都要能对照这个文件回答。
 - 判断进度看阶段性成果是否达成（PLAN §8 的验收标准），不看写了多少代码、多少测试。测试范围以 PLAN §4 的 `tests/` 清单为准（★ 关键模块 + `test_resume.py` 等运行保障）；清单之外不为小功能补测试，不追求全覆盖，不为每个小功能跑全局测试。
 
-## 运行规范（GCP Spot / Colab CLI / TC2 通用）
+## 运行规范（AutoDL / GCP Spot / Colab CLI / TC2 通用）
 - 所有训练、生成、评测脚本支持 `--resume`：从最近 checkpoint 或已完成分片继续。
 - checkpoint 包含：模型、optimizer、scheduler、RNG 状态、数据读取进度、step。`tests/test_resume.py` 验证恢复后曲线连续。
 - 每 10–20 步或 30 分钟保存一次，并同步到 GCS 桶。
@@ -59,6 +64,7 @@ D1 环境 + Go/No-Go → D2 probe + 一致性检查 → D3 策略实现 + 单测
 - GPU：Docker 镜像（veRL 0.7.x），D1 固定版本，记录在 `env/GPU_ENV.md`。
 - 代码流转：本地编辑 → push GitHub → GPU 机器 `git pull` 后运行。
 - GCP：与另一个项目共用同一个 GCP 项目；本项目用独立桶 `gs://ssrl-runs-gqf-2026`（us-central1），VM 打标签 `project=ssrl`。
+- AutoDL：本机已装第三方 CLI `autodl`（`@minato-aqukin/autodl-cli` 0.3.1，已审查：无安装脚本，token 只发往 `api.autodl.com`）。官方 API 只能建 Pro 实例（PRO6000、H800 等 7 种规格，最多 4 卡），且没有可靠库存接口，只能直接尝试创建。境内访问不了 GCS：结果先 `autodl pull` 回本地，再由本地上传到 GCS；HF / GitHub 走 `source /etc/network_turbo`。系统盘 30GB 且只有系统盘进镜像：环境装系统盘，模型和数据放数据盘或文件存储。实例连续关机 15 天会被释放。
 
 ## 协作分工（用户已确认；遵循 multi-model-collaboration 协议）
 - **跑通实验、拿到日志是第一优先级。** Claude 主导全局并编写核心代码。

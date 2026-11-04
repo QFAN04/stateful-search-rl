@@ -53,6 +53,8 @@
 用户侧待办（开工前）：
 - [x] GCP：账户已升级为付费；2026-11-02 配额申请结果：GPUS_ALL_REGIONS=1，CPUS_ALL_REGIONS=64；Spot A100 80GB 仅 us-central1、asia-southeast1 各 1 张；L4 各区域 1 张。新项目有启动限制，计划在产生 GPU 计费且满 48h 后再申请 us-central1 的 A100 扩容
 - [ ] GCP 配额扩容（D4 正式训练前需要 ≥2 张 A100，否则按 PLAN §11「GCP 配额被拒或延迟」的退路：LoRA + 缩小训练集与步数）
+  - **2026-11-04 已定：锁定 LoRA，E0–E3 改在 AutoDL 上跑**（见 CLAUDE.md「已定决策」、`docs/notes/compute_fallback.md` §9）。GCP 扩容即使批下也不再用于 E0–E3。TC2 已发邮件申请更多资源，结果未知。
+  - 外部平台退路（2026-11-04 讨论，已被上一条取代）：长训练放到外部按需平台，短任务留在 GCP / Colab，预算约 100 美元，另做一次多卡扩展实验。见 `docs/notes/compute_fallback.md`。用户 11-04 正在调研各平台能否租到多卡。
   - **首次 GPU 计费开始：2026-11-03 07:21:49 UTC（北京时间 15:21）**，VM `ssrl-a100`（us-central1-c，Spot a2-ultragpu-1g）。
   - **满 48 小时 = 2026-11-05 07:22 UTC（北京时间 11-05 15:22）后提醒用户申请扩容**：`GPUS_ALL_REGIONS=4`、us-central1 `PREEMPTIBLE_NVIDIA_A100_80GB_GPUS=4`。SSD_TOTAL_GB 已于 11-03 提到 1024GB。
   - 11-03 建机时 us-central1-a / -c 都出现过 Spot STOCKOUT，用 `scripts/gcp/retry_create.sh` 在两个 zone 间轮流重试拿到。
