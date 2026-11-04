@@ -54,6 +54,7 @@
 - [x] GCP：账户已升级为付费；2026-11-02 配额申请结果：GPUS_ALL_REGIONS=1，CPUS_ALL_REGIONS=64；Spot A100 80GB 仅 us-central1、asia-southeast1 各 1 张；L4 各区域 1 张。新项目有启动限制，计划在产生 GPU 计费且满 48h 后再申请 us-central1 的 A100 扩容
 - [ ] GCP 配额扩容（D4 正式训练前需要 ≥2 张 A100，否则按 PLAN §11「GCP 配额被拒或延迟」的退路：LoRA + 缩小训练集与步数）
   - **AutoDL 现状（2026-11-04）**：环境已存为私有镜像 `image-f5cf94c23b`（见 `env/GPU_ENV.md`）；0.6B LoRA 冒烟在 RTX 5090 上通过（`docs/experiment_cards/d3_autodl_envtest.md`）。用法：用户在网页手动开实例（选该镜像，有卡开机），把 SSH 登录指令发给 Claude；Claude 用本机密钥 `~/.ssh/autodl_ed25519` 登录（公钥已加到 AutoDL 账号）。Pro API 创建实例报"无当前资源访问权限"，暂不用 `autodl create`。
+  - **多卡与开机流程（2026-11-05）**：多卡训练必须在同一台主机上（一台实例选 N 卡，多台单卡实例不能拼）；正式 E0–E3 默认 4 台同型号单卡并行，多卡经验另做一次扩展实验；北京区首次用镜像可能要等同步；新实例数据盘为空，开机后重跑 `setup_env.sh`（可在无卡模式下）。详见 `docs/notes/compute_fallback.md` §10。
   - **2026-11-04 已定：锁定 LoRA，E0–E3 改在 AutoDL 上跑**（见 CLAUDE.md「已定决策」、`docs/notes/compute_fallback.md` §9）。GCP 扩容即使批下也不再用于 E0–E3。TC2 已发邮件申请更多资源，结果未知。
   - 外部平台退路（2026-11-04 讨论，已被上一条取代）：长训练放到外部按需平台，短任务留在 GCP / Colab，预算约 100 美元，另做一次多卡扩展实验。见 `docs/notes/compute_fallback.md`。用户 11-04 正在调研各平台能否租到多卡。
   - **首次 GPU 计费开始：2026-11-03 07:21:49 UTC（北京时间 15:21）**，VM `ssrl-a100`（us-central1-c，Spot a2-ultragpu-1g）。
