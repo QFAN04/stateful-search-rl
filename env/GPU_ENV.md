@@ -18,3 +18,4 @@
 - 不用 Docker：官方基础镜像 PyTorch 2.8 / Python 3.12 / CUDA 12.8（Ubuntu 22.04）上运行 `scripts/autodl/setup_env.sh`，装进 conda base，版本与上表训练镜像相同（torch 2.9.0+cu129、vLLM 0.12.0、verl 0.7.0、transformers 4.57.3、ray 2.52.1、flash-attn 2.8.1），其余按 `env/autodl/constraints.txt`。唯一差别：opencv-python-headless 不锁版本（见 `docs/experiment_cards/d3_autodl_envtest.md`）。
 - 数据和模型从 ModelScope 下载到数据盘 `/root/autodl-tmp/data`（数据集同上；Qwen/Qwen3-0.6B；BAAI/bge-large-en-v1.5 只取 safetensors）。
 - 已验证：RTX 5090（Blackwell，sm_120，驱动 595.71.05）0.6B LoRA 冒烟（`d3_autodl_envtest_q3-0p6b_lora_5090_20261104`）。环境装好后关机保存为私有镜像复用。
+- **私有镜像**：`image-f5cf94c23b`（名称 `ssrl-verl070-vllm012`，9.49GB，2026-11-04 23:26 保存，缓存地区西北区；基础镜像 PyTorch 2.8 / Python 3.12 / CUDA 12.8）。由上面的 5090 冒烟实例关机后保存，含 `setup_env.sh` 第 1–4 步的环境；数据盘内容不在镜像里，新实例开机后重跑 `setup_env.sh`（已完成的步骤会跳过，只下载数据和模型）。在西北区以外开机可能需要先等镜像同步。
