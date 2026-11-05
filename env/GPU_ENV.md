@@ -17,6 +17,6 @@
 ## AutoDL（2026-11-04 起，E0–E3 平台）
 - 不用 Docker：官方基础镜像 PyTorch 2.8 / Python 3.12 / CUDA 12.8（Ubuntu 22.04）上运行 `scripts/autodl/setup_env.sh`，装进 conda base，版本与上表训练镜像相同（torch 2.9.0+cu129、vLLM 0.12.0、verl 0.7.0、transformers 4.57.3、ray 2.52.1、flash-attn 2.8.1），其余按 `env/autodl/constraints.txt`。唯一差别：opencv-python-headless 不锁版本（见 `docs/experiment_cards/d3_autodl_envtest.md`）。
 - 数据和模型从 ModelScope 下载到数据盘 `/root/autodl-tmp/data`（数据集同上；Qwen/Qwen3-0.6B；BAAI/bge-large-en-v1.5 只取 safetensors）。
-- 数据和模型缓存：AutoDL 文件存储 `/root/autodl-fs/ssrl-data/`（agent-r1-data、models/{Qwen3-0.6B,bge-large-en-v1.5,Qwen3-4B-Instruct-2507}），`setup_env.sh` 和 `d3_run.sh` 优先从这里拷，没有才走 ModelScope（实测 2–3MB/s）。**文件存储只在同一地区（西北B）的实例上可用**，需先在网页控制台初始化该地区的文件存储。
+- 数据和模型缓存：AutoDL 文件存储 `/root/autodl-fs/ssrl-data/`（agent-r1-data、hotpotqa_splits、models/{Qwen3-0.6B,bge-large-en-v1.5,Qwen3-4B-Instruct-2507}，共约 13GB，2026-11-05 写入并逐文件核对大小，数据和 splits 核对 md5），`setup_env.sh` 和 `d3_run.sh` 优先从这里拷（实测约 54MB/s，全部约 4 分钟），没有才走 ModelScope（实测 2–3MB/s）。**文件存储只在同一地区（西北B）的实例上可用**；初始化后实例要重启才会挂载。
 - 已验证：RTX 5090（Blackwell，sm_120，驱动 595.71.05）0.6B LoRA 冒烟（`d3_autodl_envtest_q3-0p6b_lora_5090_20261104`）。环境装好后关机保存为私有镜像复用。
 - **私有镜像**：`image-f5cf94c23b`（名称 `ssrl-verl070-vllm012`，9.49GB，2026-11-04 23:26 保存，缓存地区西北区；基础镜像 PyTorch 2.8 / Python 3.12 / CUDA 12.8）。由上面的 5090 冒烟实例关机后保存，含 `setup_env.sh` 第 1–4 步的环境；数据盘内容不在镜像里，新实例开机后重跑 `setup_env.sh`（已完成的步骤会跳过，只下载数据和模型）。在西北区以外开机可能需要先等镜像同步。

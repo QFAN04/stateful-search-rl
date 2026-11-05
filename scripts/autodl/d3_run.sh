@@ -43,6 +43,9 @@ stage_prep() {
     { [[ -d /root/autodl-fs/ssrl-data/models/Qwen3-4B-Instruct-2507 ]] && mkdir -p "$M4B" && cp -a /root/autodl-fs/ssrl-data/models/Qwen3-4B-Instruct-2507/. "$M4B/"; } \
       || modelscope download --model Qwen/Qwen3-4B-Instruct-2507 --local_dir "$M4B" && touch "$DATA/.ssrl_setup_marks/model4b" || return 1
   fi
+  if [[ ! -s "$SPLITS_DIR/dev_select.parquet" && -d /root/autodl-fs/ssrl-data/hotpotqa_splits ]]; then
+    mkdir -p "$SPLITS_DIR" && cp -a /root/autodl-fs/ssrl-data/hotpotqa_splits/. "$SPLITS_DIR/"
+  fi
   for f in probe.parquet probe_x8.parquet dev_select.parquet; do
     [[ -s "$SPLITS_DIR/$f" ]] || { log "missing $SPLITS_DIR/$f（从本地 data/processed/hotpotqa_splits 上传）"; return 1; }
   done
