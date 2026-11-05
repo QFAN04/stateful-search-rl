@@ -40,7 +40,8 @@
 - 暂停与换机器（每组 checkpoint 按 2 卡保存，只能在 2 卡上续训）：
   - 暂停：`touch /root/autodl-tmp/PAUSE`，训练在下一次存档（每 20 步）且 adapter 复制完后停止，最多多跑 19 步，不丢已训练的步数。
   - 原机器有空卡：直接开机，删掉 PAUSE，用同一 `TAG` 重跑 `e_run.sh <policy>`。
-  - 换机器（同地区西北B）：原实例用**无卡模式**开机执行 `scripts/autodl/run_cache.sh save <run_id>`（runs 目录 + 最近一个 checkpoint 存到文件存储 `/root/autodl-fs/ssrl-runs/`），新的 2 卡实例 `run_cache.sh load <run_id>` 后用同一 `TAG` 重跑。路径在所有实例上相同，卡号不必相同。
+  - 换机器（同地区西北B）首选控制台的「跨实例拷贝数据」或「克隆实例」：把原实例数据盘（仓库、数据、模型、runs 含 checkpoint）整体搬到有空卡的 2 卡实例，原实例不用开机；具体限制以控制台说明为准，目标数据盘要 ≥ 150GB。
+  - 备用（控制台功能不可用时）：原实例用**无卡模式**开机执行 `scripts/autodl/run_cache.sh save <run_id>`（runs 目录 + 最近一个 checkpoint 存到文件存储 `/root/autodl-fs/ssrl-runs/`），新的 2 卡实例 `run_cache.sh load <run_id>` 后用同一 `TAG` 重跑。路径在所有实例上相同，卡号不必相同。
   - 跨地区：文件存储不通，需用 AutoDL 的跨实例拷贝或经本地中转（checkpoint 约 16–32GB，慢），尽量只在西北B开机。
   - 换机器后在实验卡记录新机器的驱动版本（`meta.txt` 自动记录），续训后的前 2 步检查 reward 和 `rollout_probs_diff_mean` 与暂停前衔接。
 - 每台新机器开跑前先做冒烟：`E_SMOKE=1 bash scripts/autodl/e_run.sh <要跑的 policy...>`（0.6B，2 卡，每组 4 步），确认训练、存档、adapter 保存正常；四卡机器上同时检查两组并行无冲突、主机内存够用（D3 单个 4B 训练时系统内存读数约 300GB，是否全由该训练占用未确认）。冒烟 run_id 前缀 `esmoke_`，不参与分析。
