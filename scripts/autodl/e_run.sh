@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # E0–E3 正式训练（AutoDL RTX PRO 6000 96GB）。配置见 docs/experiment_cards/e0_e3_main.md，四组只有 policy 不同。
-# **每组固定用 2 张卡**（FSDP 数据并行 + 2 个 vLLM 副本，四组同卡数，2026-11-05 用户确认）。四卡机器上两组各占 2 张卡并行。
+# **每组固定用 1 张卡**，多组在同一台机器上并行（2026-11-06 用户确认，取代「每组 2 卡」：实测 2 卡只比 1 卡快 1.19 倍，
+# rollout 受长尾轨迹限制，见实验卡「单组 2 卡记录」）。双卡机两组并行，四卡机四组并行。
 # 用法（实例内，仓库在 /root/autodl-tmp/stateful-search-rl）：
 #   nohup bash scripts/autodl/e_run.sh c0 > /root/autodl-tmp/e_run.log 2>&1 &
-#   多组：e_run.sh c1 c2 c3。每 2 张卡一个槽位，组按顺序轮流分给各槽位（四卡：卡 0,1: c1 c3；卡 2,3: c2），同一槽位的组顺序跑。
+#   多组：e_run.sh c0 c1 c2 c3。每张卡一个槽位，组按顺序轮流分给各槽位（双卡：卡 0: c0 c2；卡 1: c1 c3），同一槽位的组顺序跑。
 #   GPUS="0 1" 可手动指定用哪些卡。
 #   中断后用同样的命令重跑：已完成的组跳过，未完成的组从最近 checkpoint 续训（RESUME_MODE=auto）。
 #   续训跨日期或跨实例时用 TAG=pro6000_<首次开跑日期> 保持 run_id 不变；跨实例先用 run_cache.sh 搬运 runs/<id>。
 #   暂停：touch /root/autodl-tmp/PAUSE，训练会在下一次存档（每 20 步）且 adapter 复制完成后停止，然后走关机流程；
-#   之后在任何一台 2 卡 RTX PRO 6000 上续训（见实验卡「暂停与换机器」）。续训前删除 PAUSE。
-#   E_SMOKE=1：冒烟（0.6B，每组 4 步、第 2/4 步存档和评测），验证 2 卡训练、存档、adapter 保存、评测流程；不自动关机。
+#   之后在任何一台 RTX PRO 6000 的任意一张卡上续训（见实验卡「暂停与换机器」）。续训前删除 PAUSE。
+#   E_SMOKE=1：冒烟（0.6B，每组 4 步、第 2/4 步存档和评测），验证多组并行训练、存档、adapter 保存、评测流程；不自动关机。
 # 每组结束且 adapter 齐全后删除该组完整 checkpoint（只留 adapters/），磁盘不累积。
 # 全部结束（含 prep 失败）后 30 分钟自动关机（touch /root/autodl-tmp/NO_SHUTDOWN 可取消），另有 MAX_HOURS 硬上限。
 set -uo pipefail
@@ -17,7 +18,7 @@ REPO=/root/autodl-tmp/stateful-search-rl
 DATA=/root/autodl-tmp/data
 SPLITS_DIR="${SPLITS_DIR:-$DATA/hotpotqa_splits}"
 TAG="${TAG:-pro6000_$(TZ=Asia/Shanghai date +%Y%m%d)}"
-GPG=2   # 每组卡数（正式配置，不改）
+GPG=1   # 每组卡数（正式配置，不改；2026-11-06 由 2 改为 1）
 # 每步题数：按实验卡「批大小校准」的结果填写一次（32 或 64），四组统一；未填写时拒绝开跑
 TRAIN_BATCH_E=64   # 2026-11-06 批大小校准结果（实验卡「2 卡验收与批大小校准结果」）
 if [[ "${E_SMOKE:-0}" == 1 ]]; then
@@ -25,7 +26,7 @@ if [[ "${E_SMOKE:-0}" == 1 ]]; then
 else
   [[ "$TRAIN_BATCH_E" =~ ^(32|64)$ ]] || { echo "TRAIN_BATCH_E 未定，先做批大小校准（docs/experiment_cards/e0_e3_main.md）" >&2; exit 2; }
   MODEL_E="$DATA/models/Qwen3-4B-Instruct-2507" STEPS=150 SAVE_FREQ=20 BATCH=$TRAIN_BATCH_E VAL_FILE="$SPLITS_DIR/dev_select.parquet" PREFIX=""
-  PER_GROUP_H=20   # 2 卡 64 题实测每步约 314 秒：150 步约 13.1 小时 + 9 次评测，预计约 14 小时；留余量应对后期轨迹变长
+  PER_GROUP_H=22   # 单卡 64 题 D3 实测每步约 372 秒：150 步约 15.5 小时 + 9 次评测，预计约 16–16.5 小时；留余量应对后期轨迹变长和两组共享主机
 fi
 read -r -a GPU_LIST <<< "${GPUS:-$(nvidia-smi --query-gpu=index --format=csv,noheader | tr '\n' ' ')}"
 NSLOT=$(( ${#GPU_LIST[@]} / GPG ))
