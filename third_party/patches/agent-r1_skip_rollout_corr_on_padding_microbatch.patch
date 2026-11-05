@@ -1,3 +1,24 @@
+diff --git a/agent_r1/trainer/ppo/ray_trainer.py b/agent_r1/trainer/ppo/ray_trainer.py
+index ec5a2c6..b1eac46 100644
+--- a/agent_r1/trainer/ppo/ray_trainer.py
++++ b/agent_r1/trainer/ppo/ray_trainer.py
+@@ -1138,7 +1138,15 @@ class RayAgentTrainer(RayPPOTrainer):
+                         # update actor
+                         with marked_timer("update_actor", timing_raw, color="red"):
+                             actor_output = self._update_actor(batch)
+-                        actor_output_metrics = reduce_metrics(actor_output.meta_info["metrics"])
++                        # 各卡的 micro batch 指标条数可能不同（全填充 micro batch 跳过了 rollout-corr 指标），先拼成一维
++                        actor_output_metrics = reduce_metrics(
++                            {
++                                k: np.concatenate([np.ravel(np.asarray(x, dtype=float)) for x in v])
++                                if isinstance(v, list) and v and isinstance(v[0], (list, tuple, np.ndarray))
++                                else v
++                                for k, v in actor_output.meta_info["metrics"].items()
++                            }
++                        )
+                         metrics.update(actor_output_metrics)
+ 
+                     # Log rollout generations if enabled
 diff --git a/agent_r1/workers/actor/dp_actor.py b/agent_r1/workers/actor/dp_actor.py
 index a1ad6f6..ab90ebb 100644
 --- a/agent_r1/workers/actor/dp_actor.py
