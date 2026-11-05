@@ -6,17 +6,21 @@
 - 问题：在多跳搜索 Agent 的 GRPO 训练中，上下文策略（C0 append / C1 window / C2 模型自写笔记 / C3 规则压缩）是否影响 dev EM 与每步 prompt 长度。
 - run_id：`e{0,1,2,3}_c{0,1,2,3}_q3-4b-2507_lora_pro6000_<首次开跑日期>`；驱动脚本 `scripts/autodl/e_run.sh <policy...>`
 - 代码：D3 验收通过的版本（`docs/experiment_cards/d3_policies_tput.md`）；flow `configs/flows/ssrl_c{0..3}.yaml`；上游 Agent-R1 `b124aa4`；私有镜像 `image-f5cf94c23b`
-- 硬件：AutoDL RTX PRO 6000 96GB。四组同卡型、同镜像、同卡数：**每组固定 1 张卡**（2026-11-05 定）。多卡机器（双卡 / 四卡）只用来让不同组各占一张卡并行，不做单组多卡数据并行。理由：单卡已在 D3 验证；单组多卡要求四组都拿到同样卡数的机器（双卡、四卡存量不稳定），且 FSDP checkpoint 按卡数保存，中途换卡数不能续训；单卡组可在任意一台 RTX PRO 6000 的任意一张卡上续训。
+- 硬件：AutoDL RTX PRO 6000 96GB。四组同卡型、同镜像、同卡数：**每组固定 2 张卡**（FSDP 数据并行 + 2 个 vLLM 副本；2026-11-05 用户确认，取代当天早些时候的「每组 1 卡」）。四卡机器上两组各占 2 张卡同时跑，不做单组 4 卡。单卡只用于冒烟和小测试。理由：获得单组多卡训练的实测经验和 1 卡→2 卡提速数据；单组 4 卡对 4B LoRA 过大。代价：每组的 checkpoint 按 2 卡保存，暂停后只能在 2 卡机器上续训（见「暂停与换机器」）。
 - 模型：Qwen3-4B-Instruct-2507；LoRA rank 32 / alpha 32 / all-linear，lr 1e-5（锁定，与 D3 相同）
-- 训练：GRPO，**每步 32 或 64 题（待下方「批大小校准」定）× G=8，150 步**。一步一次更新（mini batch = 每步题数）。`e_run.sh` 里的 `TRAIN_BATCH_E` 在校准后填写一次，四组统一。max_prompt 8192、单步 response ≤1024，micro batch 4，不 offload，vLLM 显存 0.5，8 个 agent worker。
+- 训练：GRPO（每组 2 卡），**每步 32 或 64 题（待下方「批大小校准」定）× G=8，150 步**。一步一次更新（mini batch = 每步题数）。`e_run.sh` 里的 `TRAIN_BATCH_E` 在校准后填写一次，四组统一。max_prompt 8192、单步 response ≤1024，micro batch 4，不 offload，vLLM 显存 0.5，8 个 agent worker。
 
-### 批大小校准（E0 开跑前，2026-11-05 用户要求）
-- 动机：GRPO 中同一题的 8 条轨迹全对或全错时优势为 0，不提供梯度。D3 吞吐（64×8，各 3 步）实测每步"有效题"（有对有错）：C0 9 / 13 / 13 题（18.2%），C2 12 / 17 / 17 题（24.0%）（`scripts/count_mixed_groups.py`，`d3_tput_{c0,c2}_q3-4b-2507_lora_pro6000_20261105`）。按此比例，每步 32 题只有约 6–8 题有效，64 题约 12–15 题。
-- 做法：在 E0 同一台机器上先跑 `TRAIN_BATCH=32 TPUT_POLICIES=c0 TAG=b32_pro6000_<日期> bash scripts/autodl/d3_run.sh tput`（C0，32×8，3 步，不存档），run_id `d3_tput_c0_q3-4b-2507_lora_b32_pro6000_<日期>`。与 D3 的 64×8（C0 第 2–3 步平均 372 秒/步）比较每步耗时 t32、t64，并统计 32 题时的有效题数。
-- 决策规则（事先写定）：每小时有效题数之比 ≈ t64 / (2·t32)。
-  - 若 t32 > 0.6·t64（32 题省不到 40% 时间，按每小时有效题数算 64 题的效率高出 20% 以上）：用 64 题。
-  - 否则把两种配置的实测每步耗时和四组总费用报给用户，由用户决定（用户已表示为实验效果可以接受 64 题的花费）。
-- 校准结果填在本卡末尾，E0 开跑前写定，之后不再改。
+### 2 卡验收与批大小校准（E0 开跑前，在第一台 2 卡机器上做一次：`scripts/autodl/e_preflight.sh`）
+- 2 卡验收（事先写定，全部通过才开跑 E0）：
+  - 冒烟：`E_SMOKE=1 e_run.sh c0 c2`（0.6B，2 卡，每组 4 步，第 2、4 步存档 + probe 300 题 greedy 评测），`check_replay.py --expect-steps 4 --expect-trajs 64` 通过，`adapters/step_2`、`step_4` 都在。
+  - 续训：0.6B C2 2 卡，10 步 → 续到 12 步，`check_resume.py` 通过（同 D3 标准）。
+  - 训推一致：4B 2 卡吞吐 run 里 `training/rollout_probs_diff_mean` 与 D3 单卡（0.0061–0.0065）同一量级（≤ 0.02）。
+- 批大小校准：
+  - 动机：GRPO 中同一题的 8 条轨迹全对或全错时优势为 0，不提供梯度。D3 吞吐（单卡 64×8，各 3 步）实测每步"有效题"（有对有错）：C0 9 / 13 / 13 题（18.2%），C2 12 / 17 / 17 题（24.0%）（`scripts/count_mixed_groups.py`，`d3_tput_{c0,c2}_q3-4b-2507_lora_pro6000_20261105`）。按此比例，每步 32 题只有约 6–8 题有效，64 题约 12–15 题。
+  - 做法：4B C0、2 卡，32×8 和 64×8 各跑 3 步（不存档），run_id `d3_tput_c0_q3-4b-2507_lora_b{32,64}_2gpu_pro6000_<日期>`。取第 2–3 步平均每步耗时 t32、t64，并统计有效题数。
+  - 决策规则（事先写定）：每小时有效题数之比 ≈ t64 / (2·t32)。若 t32 > 0.6·t64（32 题省不到 40% 时间，按每小时有效题数算 64 题效率高出 20% 以上）：用 64 题；否则把两种配置的实测每步耗时和四组总费用报给用户，由用户决定（用户已表示为实验效果可以接受 64 题的花费）。
+  - 同时记录 1 卡→2 卡提速：D3 单卡 64×8 C0 第 2–3 步平均 372 秒 / 2 卡 t64。
+- 结果填在本卡末尾，E0 开跑前写定，之后不再改。
 - 其余沿用 recipe 默认，四组一致：不加 KL（`use_kl_loss=False`、`use_kl_in_reward=False`；PLAN §7 写的 KL 0.001 以 CLAUDE.md「以 recipe 默认为准」为准不加）、`loss_agg_mode=seq-mean-token-mean`、`norm_adv_by_std_in_grpo=True`、奖励只用 EM、5 步 / ≤4 并行检索 / top-k=5 / 自动首搜。训练数据为 recipe 的 HotpotQA train，seed 和数据顺序四组相同。
 - 策略参数：C1 `window_k=1`；C2 每步最多 3 条 note、单条 ≤300 字符；C3 每步最多 6 句、重叠 ≥2（均为 D3 定下的值）。
 
@@ -33,20 +37,28 @@
 
 ### 运行规范
 - 中断续训：同样的命令重跑，`RESUME_MODE=auto` 从最近 checkpoint 继续（D3 已验证 LoRA 续训）；跨日期用 `TAG` 保持 run_id。
-- 换实例续训：旧实例 `scripts/autodl/run_cache.sh save <run_id>`（runs 目录 + 最近一个 checkpoint 存到文件存储 `/root/autodl-fs/ssrl-runs/`），新实例 `run_cache.sh load <run_id>` 后用同一 `TAG` 重跑。只在同一地区（西北B）可用。
-- 每台新机器开跑前先做并行冒烟：`E_SMOKE=1 bash scripts/autodl/e_run.sh <要跑的 policy...>`（0.6B，每组 4 步，第 2、4 步存档和评测），确认多个训练同机并行无冲突、adapter 能保存、主机内存够用（D3 单个 4B 训练时系统内存读数约 300GB，是否全由该训练占用未确认）。冒烟 run_id 前缀 `esmoke_`，不参与分析。
+- 暂停与换机器（每组 checkpoint 按 2 卡保存，只能在 2 卡上续训）：
+  - 暂停：`touch /root/autodl-tmp/PAUSE`，训练在下一次存档（每 20 步）且 adapter 复制完后停止，最多多跑 19 步，不丢已训练的步数。
+  - 原机器有空卡：直接开机，删掉 PAUSE，用同一 `TAG` 重跑 `e_run.sh <policy>`。
+  - 换机器（同地区西北B）：原实例用**无卡模式**开机执行 `scripts/autodl/run_cache.sh save <run_id>`（runs 目录 + 最近一个 checkpoint 存到文件存储 `/root/autodl-fs/ssrl-runs/`），新的 2 卡实例 `run_cache.sh load <run_id>` 后用同一 `TAG` 重跑。路径在所有实例上相同，卡号不必相同。
+  - 跨地区：文件存储不通，需用 AutoDL 的跨实例拷贝或经本地中转（checkpoint 约 16–32GB，慢），尽量只在西北B开机。
+  - 换机器后在实验卡记录新机器的驱动版本（`meta.txt` 自动记录），续训后的前 2 步检查 reward 和 `rollout_probs_diff_mean` 与暂停前衔接。
+- 每台新机器开跑前先做冒烟：`E_SMOKE=1 bash scripts/autodl/e_run.sh <要跑的 policy...>`（0.6B，2 卡，每组 4 步），确认训练、存档、adapter 保存正常；四卡机器上同时检查两组并行无冲突、主机内存够用（D3 单个 4B 训练时系统内存读数约 300GB，是否全由该训练占用未确认）。冒烟 run_id 前缀 `esmoke_`，不参与分析。
 - 脚本结束 30 分钟后自动关机，另有 `MAX_HOURS` 硬上限（见下方预计时长）。
 - 结果（不含完整 checkpoint，含 adapters）`autodl pull` 回本地，再上传 `gs://ssrl-runs-gqf-2026/runs/`。
-- 磁盘：4B 完整 checkpoint 大小未实测（按 0.6B 推算 8–16GB / 个），保留 2 个加数据和模型约 40–50GB，**50GB 数据盘不够：单卡机器扩到 100GB，双卡机器（两组同时跑）扩到 150GB，四卡 250GB**。每组结束且 adapter 齐全（20…140、150）后脚本删除该组完整 checkpoint，多组连跑不累积；adapter 不齐时该组记为失败并保留 checkpoint。第一次存档（step 20）后核对 checkpoint 和 adapter 大小（`runs/<id>/adapters.log`），记到下方结果。
-- 预计时长 / 费用（按 D3 吞吐外推，**未实测**，加 9 次 dev 评测，每次估计 5–10 分钟）：
-  - 64 题：每步约 6–6.5 分钟（D3 实测），150 步约 16 小时，每组约 17 小时、约 ¥120；四组约 ¥480。
-  - 32 题：每步耗时由校准测出；若约为 64 题的一半，每组约 9–10 小时、约 ¥65–70，四组约 ¥260–280。
-  - `MAX_HOURS` 硬上限按批大小自动取：32 题每组 12 小时，64 题每组 20 小时（另加 2 小时）。
+- 磁盘：4B 完整 checkpoint 大小未实测（按 0.6B 推算 8–16GB / 个），保留 2 个加数据和模型约 40–50GB，**50GB 数据盘不够：双卡机器扩到 150GB（一组的 2 个 checkpoint + 数据模型 + 校准和冒烟的余量），四卡机器（两组同时跑）扩到 200GB**。每组结束且 adapter 齐全（20…140、150）后脚本删除该组完整 checkpoint，多组连跑不累积；adapter 不齐时该组记为失败并保留 checkpoint。第一次存档（step 20）后核对 checkpoint 和 adapter 大小（`runs/<id>/adapters.log`），记到下方结果。
+- 预计时长 / 费用（**未实测**；2 卡每小时约 ¥14，按 2 卡比单卡快 1.6–1.8 倍估计，加 9 次 dev 评测）：
+  - 64 题：每组约 10–11 小时、约 ¥145；四组约 ¥580，总时长（一组接一组）约 42 小时。
+  - 32 题：由校准测出。
+  - 2 卡验收与校准（`e_preflight.sh`）约 1.5 小时、约 ¥20。
+  - `MAX_HOURS` 硬上限：每组 16 小时（另加 2 小时）。
 
-## 批大小校准结果（E0 开跑前填写）
-- run_id：
-- t32（第 2–3 步平均）/ t64（D3，372 秒）：
-- 32 题时每步有效题数：
+## 2 卡验收与批大小校准结果（E0 开跑前填写）
+- 机器 / 驱动：
+- 冒烟 / 续训 / 训推一致：
+- t32 / t64（2 卡，第 2–3 步平均）：
+- 1 卡→2 卡提速（372 秒 / t64）：
+- 每步有效题数（32 / 64）：
 - 决定：
 
 ## 结果（每组跑完填写）
