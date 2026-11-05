@@ -16,8 +16,8 @@ export HOTPOTQA_EMBEDDING_MODEL="$DATA/models/bge-large-en-v1.5"
 export HOTPOTQA_CORPUS_DATA_ROOT="$DATA/agent-r1-data/hotpotqa_corpus"
 export HF_HUB_OFFLINE=1
 # 缓存、临时文件、Ray 日志放数据盘：系统盘只有 30GB，而且会被存进镜像
-mkdir -p /root/autodl-tmp/tmp /root/autodl-tmp/cache/huggingface
-export TMPDIR=/root/autodl-tmp/tmp RAY_TMPDIR=/root/autodl-tmp/tmp HF_HOME=/root/autodl-tmp/cache/huggingface
+mkdir -p /root/autodl-tmp/tmp /root/autodl-tmp/cache/huggingface "${RAY_TMPDIR:-/root/autodl-tmp/tmp}"
+export TMPDIR=/root/autodl-tmp/tmp RAY_TMPDIR="${RAY_TMPDIR:-/root/autodl-tmp/tmp}" HF_HOME=/root/autodl-tmp/cache/huggingface
 export RUN_DIR STEPS RESUME_MODE="${RESUME_MODE:-disable}"
 ATTEMPT=$(find "$RUN_DIR" -maxdepth 1 -name 'train.attempt*.log' | wc -l); ATTEMPT=$((ATTEMPT + 1))
 export VERL_FILE_LOGGER_PATH="$RUN_DIR/metrics.attempt$ATTEMPT.jsonl"
