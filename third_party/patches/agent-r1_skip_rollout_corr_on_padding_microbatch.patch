@@ -1,0 +1,13 @@
+diff --git a/agent_r1/workers/actor/dp_actor.py b/agent_r1/workers/actor/dp_actor.py
+index a1ad6f6..ab90ebb 100644
+--- a/agent_r1/workers/actor/dp_actor.py
++++ b/agent_r1/workers/actor/dp_actor.py
+@@ -164,7 +164,7 @@ class DataParallelPPOActor(VerlDataParallelPPOActor):
+                     micro_batch_metrics.update(pg_metrics)
+ 
+                     rollout_log_prob = model_inputs.get("rollout_log_probs", None)
+-                    if loss_mode != "bypass_mode" and rollout_log_prob is not None:
++                    if loss_mode != "bypass_mode" and rollout_log_prob is not None and response_mask.any():
+                         from verl.trainer.ppo.rollout_corr_helper import compute_rollout_corr_metrics_from_logprobs
+ 
+                         rollout_corr_metrics = compute_rollout_corr_metrics_from_logprobs(

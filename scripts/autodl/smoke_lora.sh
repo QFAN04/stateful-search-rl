@@ -11,6 +11,10 @@ mkdir -p "$RUN_DIR"
 
 source /root/miniconda3/etc/profile.d/conda.sh
 conda activate "${ENV_NAME:-base}"
+# 上游补丁（third_party/patches/，原因见 third_party/README.md）：未打过的打上，已打过的跳过
+for p in "$REPO"/third_party/patches/*.patch; do
+  git -C "$REPO/third_party/Agent-R1" apply --reverse --check "$p" 2>/dev/null || git -C "$REPO/third_party/Agent-R1" apply "$p"
+done
 export MODEL="${MODEL:-$DATA/models/Qwen3-0.6B}"
 export HOTPOTQA_EMBEDDING_MODEL="$DATA/models/bge-large-en-v1.5"
 export HOTPOTQA_CORPUS_DATA_ROOT="$DATA/agent-r1-data/hotpotqa_corpus"
@@ -26,6 +30,7 @@ export VERL_FILE_LOGGER_PATH="$RUN_DIR/metrics.attempt$ATTEMPT.jsonl"
   echo "platform=autodl gpu=$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader | head -1) n_gpu=$(nvidia-smi -L | wc -l)"
   echo "flow_config=${FLOW_CONFIG:-recipe} flow_name=${FLOW_NAME:-hotpotqa_agent} n_gpus=${N_GPUS:-1} train_batch=${TRAIN_BATCH:-8} rollout_n=${ROLLOUT_N:-4} max_prompt=${MAX_PROMPT:-4096} max_response=${MAX_RESPONSE:-1024} micro_bs=${MICRO_BS:-2} offload=${OFFLOAD:-True} gpu_mem_util=${GPU_MEM_UTIL:-0.5} agent_workers=${AGENT_WORKERS:-2} save_freq=${SAVE_FREQ:-5}"
   echo "repo_sha=$(git -C "$REPO" rev-parse HEAD 2>/dev/null || echo unknown) dirty=$(git -C "$REPO" status --porcelain 2>/dev/null | tr '\n' ' ')"
+  echo "agent_r1_patches=$(ls "$REPO/third_party/patches/" | tr '\n' ' ')"
   echo "extra_overrides=$*"
   sha256sum "$REPO/scripts/autodl/smoke_lora.sh" "$REPO/scripts/smoke_hotpotqa_inner.sh" | sed "s#$REPO/##"
 } >> "$RUN_DIR/meta.txt"
