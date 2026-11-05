@@ -8,7 +8,7 @@
 - 代码：D3 验收通过的版本（`docs/experiment_cards/d3_policies_tput.md`）；flow `configs/flows/ssrl_c{0..3}.yaml`；上游 Agent-R1 `b124aa4`；私有镜像 `image-f5cf94c23b`
 - 硬件：AutoDL RTX PRO 6000 96GB。四组同卡型、同镜像、同卡数：**每组固定 2 张卡**（FSDP 数据并行 + 2 个 vLLM 副本；2026-11-05 用户确认，取代当天早些时候的「每组 1 卡」）。四卡机器上两组各占 2 张卡同时跑，不做单组 4 卡。单卡只用于冒烟和小测试。理由：获得单组多卡训练的实测经验和 1 卡→2 卡提速数据；单组 4 卡对 4B LoRA 过大。代价：每组的 checkpoint 按 2 卡保存，暂停后只能在 2 卡机器上续训（见「暂停与换机器」）。
 - 模型：Qwen3-4B-Instruct-2507；LoRA rank 32 / alpha 32 / all-linear，lr 1e-5（锁定，与 D3 相同）
-- 训练：GRPO（每组 2 卡），**每步 32 或 64 题（待下方「批大小校准」定）× G=8，150 步**。一步一次更新（mini batch = 每步题数）。`e_run.sh` 里的 `TRAIN_BATCH_E` 在校准后填写一次，四组统一。max_prompt 8192、单步 response ≤1024，micro batch 4，不 offload，vLLM 显存 0.5，8 个 agent worker。
+- 训练：GRPO（每组 2 卡），**每步 64 题 × G=8，150 步**（2026-11-06 批大小校准定，见下方结果）。一步一次更新（mini batch = 每步题数）。`e_run.sh` 里 `TRAIN_BATCH_E=64`，四组统一。max_prompt 8192、单步 response ≤1024，micro batch 4，不 offload，vLLM 显存 0.5，8 个 agent worker。
 
 ### 2 卡验收与批大小校准（E0 开跑前，在第一台 2 卡机器上做一次：`scripts/autodl/e_preflight.sh`）
 - 2 卡验收（事先写定，全部通过才开跑 E0）：
@@ -53,15 +53,24 @@
   - 64 题：每组约 10–11 小时、约 ¥145；四组约 ¥580，总时长（一组接一组）约 42 小时。
   - 32 题：由校准测出。
   - 2 卡验收与校准（`e_preflight.sh`）约 1.5 小时、约 ¥20。
-  - `MAX_HOURS` 硬上限：每组 16 小时（另加 2 小时）。
+  - `MAX_HOURS` 硬上限：每组 20 小时（另加 2 小时；2026-11-06 校准后由 16 改为 20，见下方结果）。
 
 ## 2 卡验收与批大小校准结果（E0 开跑前填写）
-- 机器 / 驱动：
-- 冒烟 / 续训 / 训推一致：
-- t32 / t64（2 卡，第 2–3 步平均）：
-- 1 卡→2 卡提速（372 秒 / t64）：
-- 每步有效题数（32 / 64）：
-- 决定：
+（2026-11-06 凌晨，用户睡觉期间按其授权由 Claude 判定；日志 `/root/autodl-tmp/e_preflight*.log`，各 run 见下）
+- 机器 / 驱动：AutoDL 西北B，2× RTX PRO 6000 Blackwell Server Edition 96GB，驱动 595.71.05，私有镜像 `image-f5cf94c23b`，数据盘 150GB，主机内存 1007GB（训练中可用约 846GB）。
+- 2 卡首次上机发现 Agent-R1 多卡路径的 3 个问题（单卡不触发），合并为一个补丁 `third_party/patches/agent-r1_skip_rollout_corr_on_padding_microbatch.patch`（说明见 `third_party/README.md`），只影响诊断指标和 rollouts 日志，不改 loss / 梯度 / 优势：
+  1. 全填充 micro batch 使 veRL rollout-corr 指标断言失败（第 3 步崩溃）；
+  2. 跳过后各卡指标条数不等，`reduce_metrics` 报错；
+  3. 为整除卡数补的复制行被写进 `rollouts/*.jsonl`（回放检查 `step_index=[0, 0]`）。
+  另：私有镜像旧文件残留需在 `setup_env.sh` 前清理（`e_preflight.sh` 已改）。
+- 冒烟：`esmoke_c0_q3-0p6b_lora_2gpu_pro6000_20261106` 4 步完成，step_2 / step_4 adapter 在（78MB，0.6B checkpoint 3.2GB），回放 PASS；C2 训练完成、adapter 在，回放仅因问题 3 失败。补丁后两组重跑（03:26–03:42）：C0、C2 回放均 PASS，step_2 / step_4 adapter 都在。
+- 续训：`d3_resume_c2_q3-0p6b_lora_2gpu_pro6000_20261106` 10 步 → 12 步，`check_resume.py` RESUME_CHECK PASS（从 global_step_10 加载，lora_B 相对变化 0.259）。
+- 训推一致：4B 2 卡 `rollout_probs_diff_mean` b32 0.0059–0.0067、b64 0.0061–0.0065，与 D3 单卡（0.0061–0.0065）同量级，≤ 0.02，通过。峰值显存 80.3GB / 卡。
+- t32 / t64（2 卡，第 2–3 步平均）：t32 = (228.3 + 180.8)/2 = **204.5 秒**；t64 = (299.6 + 327.4)/2 = **313.5 秒**（`d3_tput_c0_q3-4b-2507_lora_b{32,64}_2gpu_pro6000_20261106`）。
+- 每步有效题数（32 / 64，3 步）：32 题 7 / 9 / 4（20.8%）；64 题 16 / 11 / 15（21.9%）。
+- 1 卡→2 卡提速（372 秒 / t64）：**1.19 倍**（预估 1.6–1.8 倍偏高）。分项：update_actor 171–195 → 116–132 秒（约 1.45 倍），old_log_prob 46–54 → 35–39 秒；gen 132–144 → 148–155 秒（未变快）。gen 中最慢一条轨迹（4–5 轮）约 117–120 秒，其余约 30 秒为 vLLM 唤醒 / 权重同步 / 休眠开销：rollout 受长尾轨迹的串行延迟限制，增加 vLLM 副本不缩短。缩短长尾需改 rollout 语义或上游显存管理，不在 E0 前做。
+- 决定：**每步 64 题**。规则 t32 > 0.6·t64（204.5 > 188.1）→ 64；按每小时有效题数 64 题约高 30%；与用户事先偏好一致。另征询 gpt-6-astra（建议限时 60 分钟排查 gen；按其建议先做零成本分项计时，结论如上，不再排查），采纳其提醒把每组硬上限从 18 小时提到 22 小时（`PER_GROUP_H=20`），应对后期轨迹变长。
+- 预计（按 t64 实测）：每组 150 × 313.5 秒 ≈ 13.1 小时 + 9 次 dev 评测和存档 ≈ **14 小时、约 ¥200**；四组约 56 小时、约 ¥800（原估 ¥580）。
 
 ## 结果（每组跑完填写）
 

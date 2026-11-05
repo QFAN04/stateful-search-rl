@@ -19,13 +19,13 @@ SPLITS_DIR="${SPLITS_DIR:-$DATA/hotpotqa_splits}"
 TAG="${TAG:-pro6000_$(TZ=Asia/Shanghai date +%Y%m%d)}"
 GPG=2   # 每组卡数（正式配置，不改）
 # 每步题数：按实验卡「批大小校准」的结果填写一次（32 或 64），四组统一；未填写时拒绝开跑
-TRAIN_BATCH_E=""
+TRAIN_BATCH_E=64   # 2026-11-06 批大小校准结果（实验卡「2 卡验收与批大小校准结果」）
 if [[ "${E_SMOKE:-0}" == 1 ]]; then
   MODEL_E="$DATA/models/Qwen3-0.6B" STEPS=4 SAVE_FREQ=2 BATCH=8 VAL_FILE="$SPLITS_DIR/probe.parquet" PREFIX=esmoke PER_GROUP_H=1
 else
   [[ "$TRAIN_BATCH_E" =~ ^(32|64)$ ]] || { echo "TRAIN_BATCH_E 未定，先做批大小校准（docs/experiment_cards/e0_e3_main.md）" >&2; exit 2; }
   MODEL_E="$DATA/models/Qwen3-4B-Instruct-2507" STEPS=150 SAVE_FREQ=20 BATCH=$TRAIN_BATCH_E VAL_FILE="$SPLITS_DIR/dev_select.parquet" PREFIX=""
-  PER_GROUP_H=16   # 2 卡每组预计 64 题约 10–11 小时、32 题更少（未实测），留余量
+  PER_GROUP_H=20   # 2 卡 64 题实测每步约 314 秒：150 步约 13.1 小时 + 9 次评测，预计约 14 小时；留余量应对后期轨迹变长
 fi
 read -r -a GPU_LIST <<< "${GPUS:-$(nvidia-smi --query-gpu=index --format=csv,noheader | tr '\n' ' ')}"
 NSLOT=$(( ${#GPU_LIST[@]} / GPG ))
