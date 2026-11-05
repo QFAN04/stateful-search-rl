@@ -19,6 +19,8 @@ rc=0
 step() { log "=== $1 ==="; if "${@:2}"; then log "=== $1 OK ==="; else log "=== $1 FAILED ==="; rc=1; fi; }
 
 stage_setup() {
+  # 私有镜像的旧文件残留会让 setup_env.sh 里的 import vllm 报错，先清理（prep 里还会再跑一次，幂等）
+  /root/miniconda3/bin/python scripts/autodl/clean_stale_site_packages.py || return 1
   bash scripts/autodl/setup_env.sh > /root/autodl-tmp/setup_env.log 2>&1 || { tail -20 /root/autodl-tmp/setup_env.log; return 1; }
   bash scripts/autodl/d3_run.sh prep
 }
