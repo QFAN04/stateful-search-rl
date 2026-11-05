@@ -8,7 +8,15 @@
 - 代码：D3 验收通过的版本（`docs/experiment_cards/d3_policies_tput.md`）；flow `configs/flows/ssrl_c{0..3}.yaml`；上游 Agent-R1 `b124aa4`；私有镜像 `image-f5cf94c23b`
 - 硬件：AutoDL 1×RTX PRO 6000 96GB。四组同卡型、同镜像、同卡数（单卡）。
 - 模型：Qwen3-4B-Instruct-2507；LoRA rank 32 / alpha 32 / all-linear，lr 1e-5（锁定，与 D3 相同）
-- 训练：GRPO，**每步 32 题 × G=8 = 256 条轨迹，150 步**（用户 2026-11-05 选定；PLAN §7 起始超参是每步 64–128 题，按 D3 吞吐和预算下调）。一步一次更新（mini batch = 32 题）。max_prompt 8192、单步 response ≤1024，micro batch 4，不 offload，vLLM 显存 0.5，8 个 agent worker。
+- 训练：GRPO，**每步 32 或 64 题（待下方「批大小校准」定）× G=8，150 步**。一步一次更新（mini batch = 每步题数）。`e_run.sh` 里的 `TRAIN_BATCH_E` 在校准后填写一次，四组统一。
+
+### 批大小校准（E0 开跑前，2026-11-05 用户要求）
+- 动机：GRPO 中同一题的 8 条轨迹全对或全错时优势为 0，不提供梯度。D3 吞吐（64×8，各 3 步）实测每步"有效题"（有对有错）：C0 9 / 13 / 13 题（18.2%），C2 12 / 17 / 17 题（24.0%）（`scripts/count_mixed_groups.py`，`d3_tput_{c0,c2}_q3-4b-2507_lora_pro6000_20261105`）。按此比例，每步 32 题只有约 6–8 题有效，64 题约 12–15 题。
+- 做法：在 E0 同一台机器上先跑 `TRAIN_BATCH=32 TPUT_POLICIES=c0 TAG=b32_pro6000_<日期> bash scripts/autodl/d3_run.sh tput`（C0，32×8，3 步，不存档），run_id `d3_tput_c0_q3-4b-2507_lora_b32_pro6000_<日期>`。与 D3 的 64×8（C0 第 2–3 步平均 372 秒/步）比较每步耗时 t32、t64，并统计 32 题时的有效题数。
+- 决策规则（事先写定）：每小时有效题数之比 ≈ t64 / (2·t32)。
+  - 若 t32 > 0.6·t64（32 题省不到 40% 时间，按每小时有效题数算 64 题的效率高出 20% 以上）：用 64 题。
+  - 否则把两种配置的实测每步耗时和四组总费用报给用户，由用户决定（用户已表示为实验效果可以接受 64 题的花费）。
+- 校准结果填在本卡末尾，E0 开跑前写定，之后不再改。max_prompt 8192、单步 response ≤1024，micro batch 4，不 offload，vLLM 显存 0.5，8 个 agent worker。
 - 其余沿用 recipe 默认，四组一致：不加 KL（`use_kl_loss=False`、`use_kl_in_reward=False`；PLAN §7 写的 KL 0.001 以 CLAUDE.md「以 recipe 默认为准」为准不加）、`loss_agg_mode=seq-mean-token-mean`、`norm_adv_by_std_in_grpo=True`、奖励只用 EM、5 步 / ≤4 并行检索 / top-k=5 / 自动首搜。训练数据为 recipe 的 HotpotQA train，seed 和数据顺序四组相同。
 - 策略参数：C1 `window_k=1`；C2 每步最多 3 条 note、单条 ≤300 字符；C3 每步最多 6 句、重叠 ≥2（均为 D3 定下的值）。
 
@@ -25,10 +33,19 @@
 
 ### 运行规范
 - 中断续训：同样的命令重跑，`RESUME_MODE=auto` 从最近 checkpoint 继续（D3 已验证 LoRA 续训）；跨日期用 `TAG` 保持 run_id。
-- 脚本结束 30 分钟后自动关机，另有 `MAX_HOURS` 硬上限（默认每组 12 小时 + 2）。
+- 脚本结束 30 分钟后自动关机，另有 `MAX_HOURS` 硬上限（见下方预计时长）。
 - 结果（不含完整 checkpoint，含 adapters）`autodl pull` 回本地，再上传 `gs://ssrl-runs-gqf-2026/runs/`。
 - 磁盘：4B 完整 checkpoint 大小未实测（按 0.6B 推算 8–16GB / 个），保留 2 个加数据和模型约 40–50GB，**50GB 数据盘不够，开跑前扩到 100GB**。每组结束且 adapter 齐全（20…140、150）后脚本删除该组完整 checkpoint，多组连跑不累积；adapter 不齐时该组记为失败并保留 checkpoint。第一次存档（step 20）后核对 checkpoint 和 adapter 大小（`runs/<id>/adapters.log`），记到下方结果。
-- 预计时长 / 费用（按 D3 吞吐外推，**未实测**）：训练每步约 3–3.5 分钟 × 150 步约 8–9 小时，加 9 次 dev 评测（每次估计 5–10 分钟），每组约 9–10 小时，按 ¥6.98/时约 ¥65–70；四组约 ¥260–280。
+- 预计时长 / 费用（按 D3 吞吐外推，**未实测**，加 9 次 dev 评测，每次估计 5–10 分钟）：
+  - 64 题：每步约 6–6.5 分钟（D3 实测），150 步约 16 小时，每组约 17 小时、约 ¥120；四组约 ¥480。
+  - 32 题：每步耗时由校准测出；若约为 64 题的一半，每组约 9–10 小时、约 ¥65–70，四组约 ¥260–280。
+  - `MAX_HOURS` 硬上限按批大小自动取：32 题每组 12 小时，64 题每组 20 小时（另加 2 小时）。
+
+## 批大小校准结果（E0 开跑前填写）
+- run_id：
+- t32（第 2–3 步平均）/ t64（D3，372 秒）：
+- 32 题时每步有效题数：
+- 决定：
 
 ## 结果（每组跑完填写）
 

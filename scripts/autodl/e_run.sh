@@ -14,7 +14,11 @@ SPLITS_DIR="${SPLITS_DIR:-$DATA/hotpotqa_splits}"
 TAG="${TAG:-pro6000_$(TZ=Asia/Shanghai date +%Y%m%d)}"
 M4B="$DATA/models/Qwen3-4B-Instruct-2507"
 STEPS=150 SAVE_FREQ=20
-MAX_HOURS="${MAX_HOURS:-$(( 12 * $# + 2 ))}"   # 每组按约 10 小时估计（未实测），留余量
+# 每步题数：按实验卡「批大小校准」的结果填写一次（32 或 64），四组统一；未填写时拒绝开跑
+TRAIN_BATCH_E=""
+[[ "$TRAIN_BATCH_E" =~ ^(32|64)$ ]] || { echo "TRAIN_BATCH_E 未定，先做批大小校准（docs/experiment_cards/e0_e3_main.md）" >&2; exit 2; }
+PER_GROUP_H=$(( TRAIN_BATCH_E == 64 ? 20 : 12 ))   # 每组预计 32 题约 10 小时、64 题约 17 小时（未实测），留余量
+MAX_HOURS="${MAX_HOURS:-$(( PER_GROUP_H * $# + 2 ))}"
 cd "$REPO"
 log() { echo "[$(date '+%F %T')] $*"; }
 declare -A EID=([c0]=e0 [c1]=e1 [c2]=e2 [c3]=e3)
@@ -64,9 +68,9 @@ for p in "$@"; do
   gpu_pid=$!
   keep_adapters "$run" > >(tee -a "$run/adapters.log") 2>&1 &
   keep_pid=$!
-  # 正式配置（实验卡冻结）：32 题 × G=8，150 步，每 20 步存档 + dev_select 500 题 greedy 快评（开训前也评一次）
+  # 正式配置（实验卡冻结）：TRAIN_BATCH_E 题 × G=8，150 步，每 20 步存档 + dev_select 500 题 greedy 快评（开训前也评一次）
   FLOW_CONFIG="configs/flows/ssrl_$p.yaml" FLOW_NAME="ssrl_$p" MODEL="$M4B" \
-  TRAIN_BATCH=32 ROLLOUT_N=8 MAX_PROMPT=8192 MAX_RESPONSE=1024 MICRO_BS=4 OFFLOAD=False GPU_MEM_UTIL=0.5 \
+  TRAIN_BATCH=$TRAIN_BATCH_E ROLLOUT_N=8 MAX_PROMPT=8192 MAX_RESPONSE=1024 MICRO_BS=4 OFFLOAD=False GPU_MEM_UTIL=0.5 \
   AGENT_WORKERS=8 SAVE_FREQ=$SAVE_FREQ RESUME_MODE=auto \
     bash scripts/autodl/smoke_lora.sh "$id" "$STEPS" \
       data.val_files="[\"$SPLITS_DIR/dev_select.parquet\"]" \
