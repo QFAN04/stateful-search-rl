@@ -1,8 +1,24 @@
 diff --git a/agent_r1/trainer/ppo/ray_trainer.py b/agent_r1/trainer/ppo/ray_trainer.py
-index ec5a2c6..b1eac46 100644
+index ec5a2c6..86a7e67 100644
 --- a/agent_r1/trainer/ppo/ray_trainer.py
 +++ b/agent_r1/trainer/ppo/ray_trainer.py
-@@ -1138,7 +1138,15 @@ class RayAgentTrainer(RayPPOTrainer):
+@@ -508,6 +508,15 @@ class RayAgentTrainer(RayPPOTrainer):
+             timing_raw (dict): Timing information for profiling
+             rollout_data_dir (str): Directory path to save the rollout data
+         """
++        # Dump only real rows: with dp>=2, _pad_dataproto_to_world_size appends copy rows (sample_mask=False).
++        n_all = len(batch)
++        batch, valid_mask = get_valid_data(batch)
++        if len(batch) != n_all:
++            keep = valid_mask.cpu().tolist()
++            reward_extra_infos_dict = {
++                k: [x for x, m in zip(v, keep) if m] if len(v) == n_all else v
++                for k, v in reward_extra_infos_dict.items()
++            }
+         with marked_timer("dump_rollout_generations", timing_raw, color="green"):
+             inputs = self.tokenizer.batch_decode(batch.batch["prompts"], skip_special_tokens=True)
+             outputs = self.tokenizer.batch_decode(batch.batch["responses"], skip_special_tokens=True)
+@@ -1138,7 +1147,15 @@ class RayAgentTrainer(RayPPOTrainer):
                          # update actor
                          with marked_timer("update_actor", timing_raw, color="red"):
                              actor_output = self._update_actor(batch)
