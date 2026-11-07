@@ -1,0 +1,19 @@
+# D9 放宽轮数（PLAN X1）：与 ssrl_c0.yaml 只差 max_steps 5 → 10，只用于评测。
+- name: ssrl_c0_x1
+  _target_: ssrl.env_search.SSRLSearchFlow
+  top_k: 5
+  context_policy: c0
+  window_k: 1
+  c3_max_sentences: 6
+  max_steps: 10
+  max_parallel_calls: 4
+  force_first_search: true
+
+  # BGE checkpoint. Must match `env/build_index.py --embedding_model`.
+  embedding_model_name: ${oc.env:HOTPOTQA_EMBEDDING_MODEL,BAAI/bge-large-en-v1.5}
+  # Retrieval corpus/index root. This is separate from train/validation parquet data.
+  corpus_data_dir: ${oc.env:HOTPOTQA_CORPUS_DATA_ROOT,data/corpus/hotpotqa_corpus}
+  # null: use HOTPOTQA_EMBEDDING_DEVICE (default cpu), or per-worker cuda:i
+  # if HOTPOTQA_EMBEDDING_PER_WORKER_GPU=1.
+  embedding_devices: null
+  enable_tool_parse_feedback: true
