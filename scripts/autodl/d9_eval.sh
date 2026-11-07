@@ -97,6 +97,7 @@ eval_one() {  # eval_one <policy> <dataset> <x1:0|1>
   local workers=8 mem_g
   mem_g=$(( $(cat /sys/fs/cgroup/memory.max 2>/dev/null | grep -E '^[0-9]+$' || free -b | awk '/Mem/{print $2}') / 1024 / 1024 / 1024 ))
   [[ "$ds" == 2wiki && "$mem_g" -lt 250 ]] && workers=2
+  workers="${D9_WORKERS:-$workers}"   # 崩溃重跑时手动降 worker（只影响速度，greedy 结果不变；记录在 meta.txt 和实验卡）
   log "=== eval $id adapter=step_${SEL_STEP[$p]} corpus=$(corpus_dir "$ds") workers=$workers mem=${mem_g}G ==="
   echo "d9 policy=$p dataset=$ds x1=$x1 adapter=$adapter val_file=$(val_file "$ds") agent_workers=$workers" >> "$run/meta.txt"
   nvidia-smi --query-gpu=timestamp,memory.used,utilization.gpu --format=csv,noheader -l 30 >> "$run/gpu_mem.csv" &
@@ -146,7 +147,8 @@ stage_baselines() {
     [[ -f "runs/$id/STAGE_DONE" ]] && { log "skip $id"; continue; }
     mkdir -p "runs/$id"
     log "=== baselines $id ==="
-    HF_HUB_OFFLINE=1 python -I scripts/baselines_b0b1.py --split "$(val_file "$ds")" --corpus-dir "$(corpus_dir "$ds")" \
+    # 检索器默认按 HF 名字加载 bge，离线实例要指向本地（与训练 / 评测时相同的权重）
+    HF_HUB_OFFLINE=1 HOTPOTQA_EMBEDDING_MODEL="$EMB" python -I scripts/baselines_b0b1.py --split "$(val_file "$ds")" --corpus-dir "$(corpus_dir "$ds")" \
       --out "runs/$id" --model "$MODEL" > "runs/$id/run.log" 2>&1 \
       && date -u +%FT%TZ > "runs/$id/STAGE_DONE" && log "=== baselines $id OK ===" || { log "=== baselines $id FAILED ==="; rc=1; }
   done
