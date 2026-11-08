@@ -2,7 +2,8 @@
 
 步骤：
   extract  从 E2 的 dev 输出、训练 rollouts、D9 test 输出里抽取每次 note 调用 + 引用段落，做自动指标
-  judge    用 Vertex AI gemini-3.8-flash 判 faithful / relevant（可断点续跑，结果追加写入 judged.jsonl）
+  judge    --judge gemini|deepseek，判 faithful / relevant（可断点续跑，结果追加写入 judged_<judge>.jsonl）
+           Gemini 项目 2026-11-08 被 Google 限制（630/751 已判）；DeepSeek 全部 751 条重判、与 Gemini 交叉对比
   report   汇总 + Wilson 区间，写 summary.json
 用法（仓库根目录）：python -I scripts/rq2_note_quality.py extract|judge|report [--out runs/d10_rq2_note_quality_20261108]
 judge 需要 gcloud 用户登录（gcloud auth print-access-token），项目 llm-rl-lab-2026。
@@ -164,11 +165,42 @@ def call(rec):
             return {"id": rec["id"], "faithful": j.get("faithful"), "relevant": j.get("relevant"), "reason": j.get("reason"), "model": MODEL}
         except Exception as e:  # noqa: BLE001
             err = str(e)
+            if "401" in err:  # gcloud 返回的缓存 token 过期：强制下次重新取
+                with _lock:
+                    _tok["at"] = 0
             time.sleep(2 ** attempt)
     return {"id": rec["id"], "error": err}
 
 
-def judge(out):
+DS_MODEL = "deepseek-flash"
+
+
+def call_deepseek(rec):
+    """同一 prompt，DeepSeek（OpenAI 兼容接口，JSON 模式）。2026-11-08 Gemini 项目被限制后全部 751 条重判、与 Gemini 交叉对比。"""
+    import os
+    body = {"model": DS_MODEL, "temperature": 0, "reasoning_effort": "high", "response_format": {"type": "json_object"},
+            "messages": [{"role": "user", "content": PROMPT.format(q=rec["question"], a=rec["answer"], p=rec["passage"][:2000], n=rec["fact"])}]}
+    err = ""
+    for attempt in range(5):
+        try:
+            req = urllib.request.Request("https://api.deepseek.com/chat/completions", data=json.dumps(body).encode(),
+                                         headers={"Authorization": f"Bearer {os.environ['DEEPSEEK_API_KEY']}", "Content-Type": "application/json"})
+            d = json.loads(urllib.request.urlopen(req, timeout=180).read())
+            j = json.loads(d["choices"][0]["message"]["content"])
+            return {"id": rec["id"], "faithful": j.get("faithful"), "relevant": j.get("relevant"), "reason": j.get("reason"),
+                    "model": d.get("model", DS_MODEL), "usage": d.get("usage", {}).get("total_tokens")}
+        except Exception as e:  # noqa: BLE001
+            err = str(e)
+            if "403" in err or "402" in err:  # 被拒或余额不足：不重试
+                break
+            time.sleep(2 ** attempt)
+    return {"id": rec["id"], "error": err}
+
+
+JUDGES = {"gemini": call, "deepseek": call_deepseek}
+
+
+def judge(out, which="gemini"):
     recs = [json.loads(line) for line in open(out / "notes.jsonl", encoding="utf-8")]
     rng = random.Random(SEED)
     todo = []
@@ -177,13 +209,13 @@ def judge(out):
         todo += rng.sample(v, CAP) if len(v) > CAP else v
     rng.shuffle(todo)  # 训练前后打乱，judge 看不到组别
     done = set()
-    jf = out / "judged.jsonl"
+    jf = out / f"judged_{which}.jsonl"
     if jf.exists():
         done = {json.loads(line)["id"] for line in open(jf, encoding="utf-8") if "error" not in line}
     todo = [r for r in todo if r["id"] not in done]
     print("to judge:", len(todo))
     with open(jf, "a", encoding="utf-8") as f, ThreadPoolExecutor(8) as ex:
-        for i, res in enumerate(ex.map(call, todo)):
+        for i, res in enumerate(ex.map(JUDGES[which], todo)):
             f.write(json.dumps(res, ensure_ascii=False) + "\n")
             f.flush()
             if i % 50 == 0:
@@ -200,21 +232,48 @@ def wilson(k, n):
     return (round(p, 3), round(c - h, 3), round(c + h, 3))
 
 
+def load_judged(path):
+    jud = {}
+    if path.exists():
+        for line in open(path, encoding="utf-8"):
+            j = json.loads(line)
+            if "error" not in j:
+                jud[j["id"]] = j
+    return jud
+
+
+def kappa(pairs):
+    """Cohen's kappa 与原始一致率。"""
+    n = len(pairs)
+    if n == 0:
+        return None
+    po = sum(a == b for a, b in pairs) / n
+    labels = {x for p in pairs for x in p}
+    pe = sum((sum(a == lab for a, _ in pairs) / n) * (sum(b == lab for _, b in pairs) / n) for lab in labels)
+    return {"n": n, "agreement": round(po, 3), "kappa": round((po - pe) / (1 - pe), 3) if pe < 1 else None}
+
+
 def report(out):
     recs = {r["id"]: r for r in map(json.loads, open(out / "notes.jsonl", encoding="utf-8"))}
-    jud = {}
-    for line in open(out / "judged.jsonl", encoding="utf-8"):
-        j = json.loads(line)
-        if "error" not in j:
-            jud[j["id"]] = j
     meta = json.load(open(out / "extract_meta.json"))
-    summ = {"extract": meta, "groups": {}}
+    J = {w: load_judged(out / f"judged_{w}.jsonl") for w in JUDGES}
+    both = sorted(set(J["gemini"]) & set(J["deepseek"]))
+    summ = {"extract": meta, "agreement_gemini_vs_deepseek": {
+        k: kappa([(J["gemini"][i][k], J["deepseek"][i][k]) for i in both]) for k in ("faithful", "relevant")}, "groups": {}}
+    for w in JUDGES:
+        summ["groups"][w] = _groups(recs, J[w])
+    json.dump(summ, open(out / "summary.json", "w"), indent=1, ensure_ascii=False)
+    print(json.dumps(summ, indent=1, ensure_ascii=False))
+
+
+def _groups(recs, jud):
+    res = {}
     for g in ["dev_step0", "dev_step150", "train_1-10", "train_141-150", "d9_test"]:
         allg = [r for r in recs.values() if r["group"] == g]
         val = [r for r in allg if r["valid"]]
         jg = [jud[r["id"]] for r in val if r["id"] in jud]
         sfk = [r for r in val if r["cites_supporting_fact"] is not None]
-        summ["groups"][g] = {
+        res[g] = {
             "notes": len(allg), "valid": wilson(len(val), len(allg)),
             "cites_supporting_fact": wilson(sum(r["cites_supporting_fact"] for r in sfk), len(sfk)),
             "fact_contains_answer": wilson(sum(r["fact_contains_answer"] for r in val), len(val)),
@@ -224,13 +283,17 @@ def report(out):
             "relevant_yes": wilson(sum(j["relevant"] == "yes" for j in jg), len(jg)),
             "traj_em_with_notes": round(sum(r["traj_score"] for r in allg) / max(len(allg), 1), 3),
         }
-    json.dump(summ, open(out / "summary.json", "w"), indent=1, ensure_ascii=False)
-    print(json.dumps(summ, indent=1, ensure_ascii=False))
+    return res
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("stage", choices=["extract", "judge", "report"])
+    ap.add_argument("--judge", choices=list(JUDGES), default="deepseek")
     ap.add_argument("--out", default=str(ROOT / "runs" / "d10_rq2_note_quality_20261108"))
     a = ap.parse_args()
-    {"extract": extract, "judge": judge, "report": report}[a.stage](pathlib.Path(a.out))
+    out = pathlib.Path(a.out)
+    if a.stage == "judge":
+        judge(out, a.judge)
+    else:
+        {"extract": extract, "report": report}[a.stage](out)
