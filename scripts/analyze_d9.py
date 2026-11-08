@@ -87,5 +87,54 @@ def main():
                 print(f"  {lab}（{len(ks)} 题）:", {p: round(sum(g[p][k]['score'] for k in ks) / len(ks), 3) for p in POL})
 
 
+SPLITS = {"test": "data/processed/hotpotqa_splits/test.parquet", "musique": "data/processed/ood_splits/musique_500.parquet",
+          "2wiki": "data/processed/ood_splits/2wiki_500.parquet"}
+
+
+def answer_metrics():
+    """实验卡预登记的辅助指标：只对 ground_truth 的 EM、命中任一别名的 EM（= 训练奖励函数实际口径）、token F1（对所有答案取最大）。"""
+    import collections
+
+    import pandas as pd
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "third_party" / "Agent-R1"))
+    from recipes.hotpotqa.reward_fn import _extract_answer_from_solution as ext
+    from recipes.hotpotqa.reward_fn import _normalize_answer as norm
+
+    def f1(p, g):
+        pt, gt = norm(p).split(), norm(g).split()
+        c = sum((collections.Counter(pt) & collections.Counter(gt)).values())
+        if c == 0:
+            return 0.0
+        pr, rc = c / len(pt), c / len(gt)
+        return 2 * pr * rc / (pr + rc)
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+    print("\n===== 答案指标：EM(只 ground_truth) / EM(含别名，=记录的主指标) / token F1(对所有答案取最大) =====")
+    for ds in ["test", "musique", "2wiki"]:
+        t = pd.read_parquet(root / SPLITS[ds])
+        ans = {}
+        for pr, rm, e in zip(t.prompt, t.reward_model, t.extra_info):
+            al = e.get("answers")
+            ans[pr[0]["content"].strip()] = (rm["ground_truth"], [str(x) for x in (list(al) if al is not None else [])])
+        rows = []
+        for x1 in (False, True):
+            for p in POL:
+                g = load(ds, p, x1)
+                rows.append((f"{p}{' x1' if x1 else ''}", [(ext(r["output"]), *ans[q], r["score"]) for q, r in g.items()]))
+        bdir = RUNS / f"d9_b0b1_{ds}_q3-4b-2507_pro6000_20261108"
+        for b in ("b0", "b1"):
+            recs = [json.loads(line) for line in open(bdir / f"{b}.jsonl", encoding="utf-8")]
+            rows.append((b, [(ext(r["output"]), *ans[r["question"].strip()], r["score"]) for r in recs]))
+        print(f"-- {ds} --")
+        for name, items in rows:
+            n = len(items)
+            em_gt = sum(norm(pr) == norm(gt) for pr, gt, al, _ in items) / n
+            em_al = sum(norm(pr) in {norm(a) for a in [gt] + al} for pr, gt, al, _ in items) / n
+            fl = sum(max(f1(pr, a) for a in [gt] + al) for pr, gt, al, _ in items) / n
+            rec = sum(s for *_, s in items) / n
+            print(f"  {name:<7} EM_gt={em_gt:.3f}  EM_alias={em_al:.3f}  F1={fl:.3f}  (recorded={rec:.3f}, n={n})")
+
+
 if __name__ == "__main__":
     main()
+    answer_metrics()
