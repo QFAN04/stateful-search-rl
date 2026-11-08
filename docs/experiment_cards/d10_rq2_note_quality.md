@@ -39,10 +39,10 @@
   | D9 test（训练后） | 43 | 0.767 | 0.070 | 0.907 | 0.721 | 0.465 |
 
   Gemini（630 条）给出的数值几乎相同：训练 1–10 步 faithful 0.723、relevant 0.912；141–150 步 faithful 0.814、relevant 0.794。
-- judge 一致性：Gemini 与 DeepSeek 在共同 630 条上 faithful 一致率 0.968（kappa 0.918）、relevant 0.956（kappa 0.773）。人工复核 30 条（Claude 在看 judge 结果前写定标签，`audit_claude.json` 12:53 写入）：与 DeepSeek faithful 一致 0.900、relevant 0.933；与 Gemini 0.867、1.000，均高于 80% 阈值。分歧全是 judge 比人工更严（把「lays claim to being the oldest」写成「the oldest」之类的轻微夸大判为 partial），方向一致。
+- judge 一致性：Gemini 与 DeepSeek 在共同 630 条上 faithful 一致率 0.968（kappa 0.918）、relevant 0.956（kappa 0.773）。Claude 盲审 30 条（第三个模型、不是人工标注；设定第 20 行「人工复核」的说法不准确，实际是 Claude 复核；在看 judge 结果前写定标签，`audit_claude.json` 12:53 写入）：与 DeepSeek faithful 一致 0.900、relevant 0.933；与 Gemini 0.867、1.000，均高于 80% 阈值。分歧全是 judge 比 Claude 更严（把「lays claim to being the oldest」写成「the oldest」之类的轻微夸大判为 partial），方向一致。
 - 结论：
   1. **RL 没有提高笔记的整体质量，主要改变的是数量。** 笔记本来就基本忠实（训练前明确幻觉约 2%）、相关（约 93%）。训练后：忠实度上升（0.72 → 0.81，区间不重叠），但相关性下降（0.93 → 0.85）、引用官方 supporting fact 的比例下降（0.86 → 0.75，区间不重叠）、笔记直接含答案的比例下降（0.62 → 0.54）。两个 judge 方向一致。
   2. 同时笔记数量大幅下降（dev 58 → 14 条 / 500 题；训练 646 → 236 条 / 5120 条轨迹）。即只用 EM 奖励时，RL 让模型「少写、写得更保守（更贴原文但更少命中关键证据）」，而不是学会提炼关键证据。
   3. 与 D9 的行为结论一致：C2 的问题是笔记太少、没能保住跨轮证据，而不是笔记在胡写。支持 E4（笔记奖励按 supporting fact 命中给分）的设计方向。
-  4. 局限：dev 训练后只有 14 条，单看 dev 无法下结论，主要依据训练 rollouts 的对比；「relevant」由 LLM 判断，含主观成分，但两 judge 与人工复核一致。
+  4. 局限：dev 训练后只有 14 条，单看 dev 无法下结论，主要依据训练 rollouts 的对比；「relevant」由 LLM 判断，含主观成分，但两 judge 与 Claude 盲审一致。
 - 费用：DeepSeek ¥0.27（余额 12.54 → 12.27）；Gemini 630 次调用在赠金内。
