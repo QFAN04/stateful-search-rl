@@ -213,8 +213,8 @@ stateful-search-rl/
 | E1 | C1 window | GRPO | 必做 |
 | E2 | C2 curate | GRPO | 必做（核心） |
 | E3 | C3 rule | GRPO | 必做（控制组） |
-| E4 | C2 | 第 2 个 seed | 预算允许 |
-| E5 | C0 | 第 2 个 seed | 预算允许 |
+| E4 | C2 | 笔记奖励（2026-11-08 用户选定，候选，取代原「第 2 个 seed」；见 `docs/experiment_cards/e4_e5_candidates.md`） | 候选，之后有空再做 |
+| E5 | C2 | SFT 冷启动（同上，取代原「C0 第 2 个 seed」） | 候选，之后有空再做 |
 | X1 | 全部 | OOD 和放宽最大轮数的外推评测（只推理） | 必做，成本低 |
 | X2 | C2 | DAPO 式动态采样开/关（若 veRL 0.7 已有实现就直接开） | 扩展 |
 
