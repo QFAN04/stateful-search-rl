@@ -36,7 +36,19 @@ def metric(ds, p, x1=False):
 
 
 def b1(ds):
-    return json.load(open(RUNS / f"d9_b0b1_{ds}_q3-4b-2507_pro6000_20261108" / "summary.json", encoding="utf-8"))["b1"]["em"]
+    """B1 的 EM，按与四组相同的口径（训练奖励函数，OOD 含答案别名）重算；summary.json 里记录的是只对 ground_truth 的 EM。"""
+    import pandas as pd
+    root = pathlib.Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "third_party" / "Agent-R1"))
+    from recipes.hotpotqa.reward_fn import compute_score
+    from analyze_d9 import SPLITS
+    t = pd.read_parquet(root / SPLITS[ds])
+    # pandas 把 answers 读成 numpy 数组，上游函数只认 list（训练时经 HF datasets 读入，是 list）
+    fix = lambda e: {**e, "answers": list(e["answers"])} if e.get("answers") is not None else e  # noqa: E731
+    meta = {pr[0]["content"].strip(): (ds_, rm["ground_truth"], fix(e)) for pr, rm, e, ds_ in zip(t.prompt, t.reward_model, t.extra_info, t.data_source)}
+    recs = [json.loads(line) for line in open(RUNS / f"d9_b0b1_{ds}_q3-4b-2507_pro6000_20261108" / "b1.jsonl", encoding="utf-8")]
+    return sum(compute_score(meta[r["question"].strip()][0], r["output"], meta[r["question"].strip()][1],
+                             meta[r["question"].strip()][2]) for r in recs) / len(recs)
 
 
 def style(ax):

@@ -17,9 +17,10 @@
 - C3 在三个数据集上都处在帕累托前沿上：EM 与 C0 持平或略高（配对检验不显著），token 少 8%（test）/ 17%（MuSiQue）/ 20%（2Wiki）。
 - C1 最省 token（比 C0 少 14–30%），在 HotpotQA 上不掉分，在 2Wiki 上掉 11pp。
 - C2 既不省 token（笔记 + 最近一轮文档 ≈ C0），在多轮题上又掉分：被 C3 支配。
-- 参照：B1（单次检索）test 0.335、MuSiQue 0.064、2Wiki 0.222；B0（无检索）0.116 / 0.018 / 0.212。四组 RL 都远高于两个基线。
+- 参照（与四组同口径，OOD 含答案别名）：B1（单次检索）test 0.335、MuSiQue 0.068、2Wiki 0.280；B0（无检索）0.116 / 0.018 / 0.252。四组 RL 都远高于两个基线。
+- 口径：EM = 训练奖励函数 `compute_score`，OOD 上会把数据集给的答案别名算作正确（实验卡写成了「只对 ground_truth」，已在卡里更正）。只对 ground_truth 的 EM 与 token F1 见实验卡「补充分析 / 答案指标」：三种口径下组间排序一致（2Wiki 只对 ground_truth：C0 0.516 / C1 0.422 / C2 0.380 / C3 0.530）。
 
-## 显著性（同题配对 McNemar，`scripts/analyze_d9.py`）
+## 显著性（同题配对 McNemar，`scripts/analyze_d9.py`；含对错计数的完整表、失败方式表、C2 有 / 无笔记对比见实验卡「补充分析」①–④）
 | | C0 vs C1 | C0 vs C2 | C3 vs C1 | C3 vs C2 | C3 vs C0 |
 |---|---|---|---|---|---|
 | HotpotQA test | 0.91 | 0.15 | 0.36 | 0.030 | 0.43 |
