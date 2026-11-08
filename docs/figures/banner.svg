@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 560" width="1280" height="560">
+  <defs>
+    <style>
+      .hand { font-family: 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', 'Segoe Print', cursive; }
+      .chunky { font-family: 'Arial Rounded MT Bold', 'Nunito', 'Varela Round', 'Arial Black', 'Helvetica Neue', sans-serif; font-weight: 900; }
+      .ink { stroke: #1d1d1f; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+    <!-- 文档卡片（漫画描边） -->
+    <g id="doc">
+      <rect width="46" height="58" rx="7" fill="#ffffff" class="ink" stroke-width="3.5"/>
+      <rect x="9" y="11" width="28" height="5" rx="2.5" fill="#8b95a8"/>
+      <rect x="9" y="22" width="24" height="3.5" rx="1.75" fill="#c7cdd8"/>
+      <rect x="9" y="30" width="28" height="3.5" rx="1.75" fill="#c7cdd8"/>
+      <rect x="9" y="38" width="20" height="3.5" rx="1.75" fill="#c7cdd8"/>
+      <rect x="9" y="46" width="26" height="3.5" rx="1.75" fill="#c7cdd8"/>
+    </g>
+    <g id="ok">
+      <circle r="17" fill="#2fb67c" class="ink" stroke-width="3.5"/>
+      <path d="M-8 0 l5.5 6 l10 -12" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="no">
+      <circle r="17" fill="#ef5b5b" class="ink" stroke-width="3.5"/>
+      <path d="M-6.5 -6.5 l13 13 M6.5 -6.5 l-13 13" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+    </g>
+  </defs>
+
+  <!-- 背景卡片 -->
+  <rect x="8" y="8" width="1264" height="544" rx="28" fill="#e9e6df"/>
+  <rect x="4" y="4" width="1264" height="544" rx="28" fill="#fbfaf6" class="ink" stroke-width="4"/>
+
+  <!-- ================= 吉祥物 ================= -->
+  <g transform="translate(46 26)">
+    <ellipse cx="112" cy="246" rx="70" ry="9" fill="#1d1d1f" fill-opacity="0.12"/>
+    <!-- 天线 -->
+    <line x1="110" y1="22" x2="110" y2="50" class="ink" stroke-width="5"/>
+    <circle cx="110" cy="17" r="10" fill="#2a9d8f" class="ink" stroke-width="4"/>
+    <!-- 左臂 + 笔记本 -->
+    <path d="M72 180 Q48 196 44 214" fill="none" class="ink" stroke-width="17"/>
+    <path d="M72 180 Q48 196 44 214" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+    <g transform="rotate(-14 34 214)">
+      <rect x="10" y="190" width="46" height="54" rx="6" fill="#ffb347" class="ink" stroke-width="4"/>
+      <rect x="18" y="200" width="30" height="16" rx="3" fill="#fff4dd" class="ink" stroke-width="2.5"/>
+      <line x1="10" y1="196" x2="10" y2="238" class="ink" stroke-width="2"/>
+    </g>
+    <circle cx="44" cy="214" r="11" fill="#ffffff" class="ink" stroke-width="4"/>
+    <!-- 身体 -->
+    <rect x="62" y="152" width="96" height="84" rx="28" fill="#4fb3a9" class="ink" stroke-width="5"/>
+    <circle cx="110" cy="194" r="19" fill="#ffffff" class="ink" stroke-width="3.5"/>
+    <text x="110" y="201" class="chunky" font-size="17" fill="#2a9d8f" text-anchor="middle">SS</text>
+    <!-- 头 -->
+    <rect x="42" y="48" width="136" height="108" rx="46" fill="#ffffff" class="ink" stroke-width="5"/>
+    <rect x="60" y="68" width="100" height="62" rx="27" fill="#1f2547" class="ink" stroke-width="3"/>
+    <path d="M78 104 q11 -15 22 0" fill="none" stroke="#5fe0c4" stroke-width="6.5" stroke-linecap="round"/>
+    <path d="M120 104 q11 -15 22 0" fill="none" stroke="#5fe0c4" stroke-width="6.5" stroke-linecap="round"/>
+    <!-- 右臂（举起） -->
+    <path d="M154 176 Q186 160 196 134" fill="none" class="ink" stroke-width="17"/>
+    <path d="M154 176 Q186 160 196 134" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+    <!-- 放大镜：手柄从手里一直连到镜框 -->
+    <line x1="186" y1="152" x2="216" y2="96" class="ink" stroke-width="18"/>
+    <line x1="186" y1="152" x2="216" y2="96" stroke="#b5651d" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="234" cy="64" r="36" fill="#cfe9ff" fill-opacity="0.85" class="ink" stroke-width="9"/>
+    <path d="M214 52 q8 -14 24 -14" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+    <!-- 握住手柄的手（画在手柄上面） -->
+    <circle cx="198" cy="130" r="13" fill="#ffffff" class="ink" stroke-width="4"/>
+  </g>
+
+  <!-- ================= 标题 ================= -->
+  <g class="chunky" font-size="70" letter-spacing="-1">
+    <text x="338" y="128" fill="#1d1d1f" fill-opacity="0.18">StatefulSearch-RL</text>
+    <text x="334" y="124"><tspan fill="#2a9d8f">Stateful</tspan><tspan fill="#e76f51">Search</tspan><tspan fill="#1d1d1f">-RL</tspan></text>
+  </g>
+  <text x="338" y="172" class="hand" font-size="27" fill="#1d1d1f" font-weight="700">What should a search agent remember between rounds?</text>
+  <text x="338" y="208" class="hand" font-size="17" fill="#5c6270">GRPO · Qwen3-4B + LoRA · Agent-R1 / veRL · HotpotQA · MuSiQue · 2Wiki</text>
+
+  <!-- 题目气泡 -->
+  <g>
+    <rect x="338" y="226" width="800" height="40" rx="20" fill="#ffffff" class="ink" stroke-width="3"/>
+    <text x="358" y="252" class="hand" font-size="16.5" fill="#1d1d1f">Q: “Which film's director died first?”  R1 → director X · R2 → X's death date · R3 → director Y …</text>
+  </g>
+
+  <!-- ================= 四格漫画 ================= -->
+  <text x="40" y="300" class="hand" font-size="16" fill="#5c6270">What's still in context at round 3?</text>
+
+  <!-- C0 the hoarder -->
+  <g transform="translate(40 312)">
+    <rect x="5" y="5" width="288" height="222" rx="20" fill="#d9dee8"/>
+    <rect width="288" height="222" rx="20" fill="#eaf2ff" class="ink" stroke-width="4"/>
+    <text x="20" y="36" class="hand" font-size="22" font-weight="700" fill="#2a78d6">C0 · append</text>
+    <text x="20" y="58" class="hand" font-size="15" fill="#5c6270">“the hoarder”</text>
+    <use href="#doc" x="58" y="78" transform="rotate(-9 81 107)"/>
+    <use href="#doc" x="118" y="72"/>
+    <use href="#doc" x="178" y="78" transform="rotate(9 201 107)"/>
+    <g class="hand" font-size="13" fill="#5c6270" text-anchor="middle"><text x="81" y="156">R1</text><text x="141" y="156">R2</text><text x="201" y="156">R3</text></g>
+    <use href="#ok" x="36" y="190"/>
+    <text x="62" y="196" class="hand" font-size="14.5" fill="#1d1d1f">keeps it all, longest context</text>
+  </g>
+
+  <!-- C1 the goldfish -->
+  <g transform="translate(343 312)">
+    <rect x="5" y="5" width="288" height="222" rx="20" fill="#e8ddd6"/>
+    <rect width="288" height="222" rx="20" fill="#fff0e8" class="ink" stroke-width="4"/>
+    <text x="20" y="36" class="hand" font-size="22" font-weight="700" fill="#e76f51">C1 · window</text>
+    <text x="20" y="58" class="hand" font-size="15" fill="#5c6270">“the goldfish”</text>
+    <!-- 飞走的旧文档 -->
+    <g opacity="0.35" transform="rotate(-18 70 96)"><use href="#doc" x="48" y="70"/></g>
+    <g opacity="0.35" transform="rotate(-8 124 108)"><use href="#doc" x="102" y="80"/></g>
+    <path d="M44 132 q10 -6 20 0 M100 140 q10 -6 20 0" fill="none" stroke="#e76f51" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 6"/>
+    <use href="#doc" x="186" y="78"/>
+    <!-- 问号气泡 -->
+    <circle cx="246" cy="74" r="15" fill="#ffffff" class="ink" stroke-width="3"/>
+    <text x="246" y="81" class="chunky" font-size="18" fill="#e76f51" text-anchor="middle">?</text>
+    <text x="209" y="156" class="hand" font-size="13" fill="#5c6270" text-anchor="middle">R3</text>
+    <use href="#no" x="36" y="190"/>
+    <text x="62" y="196" class="hand" font-size="14.5" fill="#1d1d1f">forgets X, searches again</text>
+  </g>
+
+  <!-- C2 the dozing note-taker -->
+  <g transform="translate(646 312)">
+    <rect x="5" y="5" width="288" height="222" rx="20" fill="#d6e6df"/>
+    <rect width="288" height="222" rx="20" fill="#e9f8f1" class="ink" stroke-width="4"/>
+    <text x="20" y="36" class="hand" font-size="22" font-weight="700" fill="#1f9d6b">C2 · notes</text>
+    <text x="20" y="58" class="hand" font-size="15" fill="#5c6270">“the dozing note-taker”</text>
+    <!-- 摊开的空白笔记本 -->
+    <path d="M40 84 q42 -10 74 4 v62 q-32 -14 -74 -4 z" fill="#fffaf0" class="ink" stroke-width="3.5"/>
+    <path d="M114 88 q32 -14 74 -4 v62 q-42 -10 -74 4 z" fill="#fffaf0" class="ink" stroke-width="3.5"/>
+    <line x1="54" y1="102" x2="86" y2="98" stroke="#c7b48a" stroke-width="3" stroke-linecap="round"/>
+    <!-- 铅笔：笔尖落在左页那道唯一的笔迹末端，笔身向右上斜放 -->
+    <g transform="translate(88 99) rotate(-16)">
+      <path d="M0 0 L13 -5.5 L13 5.5 Z" fill="#f4e1c1" class="ink" stroke-width="3"/>
+      <path d="M0 0 L4.5 -1.9 L4.5 1.9 Z" fill="#1d1d1f"/>
+      <rect x="13" y="-5.5" width="44" height="11" rx="1.5" fill="#ffd166" class="ink" stroke-width="3"/>
+      <rect x="57" y="-5.5" width="10" height="11" rx="2.5" fill="#ff9aa8" class="ink" stroke-width="3"/>
+    </g>
+    <text x="214" y="96" class="hand" font-size="20" font-weight="700" fill="#1f9d6b">z</text>
+    <text x="230" y="80" class="hand" font-size="24" font-weight="700" fill="#1f9d6b">z</text>
+    <text x="250" y="62" class="hand" font-size="28" font-weight="700" fill="#1f9d6b">z</text>
+    <use href="#no" x="36" y="190"/>
+    <text x="62" y="196" class="hand" font-size="14.5" fill="#1d1d1f">RL learns to stop taking notes</text>
+  </g>
+
+  <!-- C3 the highlighter -->
+  <g transform="translate(949 312)">
+    <rect x="5" y="5" width="288" height="222" rx="20" fill="#ebe2cc"/>
+    <rect width="288" height="222" rx="20" fill="#fff7e0" class="ink" stroke-width="4"/>
+    <text x="20" y="36" class="hand" font-size="22" font-weight="700" fill="#c98500">C3 · rule</text>
+    <text x="20" y="58" class="hand" font-size="15" fill="#5c6270">“the highlighter”</text>
+    <!-- 关键句摘要卡 -->
+    <rect x="34" y="76" width="96" height="66" rx="8" fill="#ffffff" class="ink" stroke-width="3.5"/>
+    <rect x="44" y="88" width="72" height="10" rx="3" fill="#ffd23f"/>
+    <rect x="44" y="106" width="60" height="10" rx="3" fill="#ffd23f"/>
+    <rect x="44" y="124" width="44" height="4" rx="2" fill="#c7cdd8"/>
+    <!-- 荧光笔：斜切笔头落在第二道高亮的末端，笔身向右上斜放 -->
+    <g transform="translate(106 111) rotate(-35)">
+      <path d="M0 -3 L9 -6 L9 6 L0 3 Z" fill="#f2b705" class="ink" stroke-width="3"/>
+      <rect x="9" y="-8" width="44" height="16" rx="3" fill="#ffd23f" class="ink" stroke-width="3"/>
+      <rect x="53" y="-8" width="14" height="16" rx="3" fill="#1d1d1f" class="ink" stroke-width="3"/>
+    </g>
+    <use href="#doc" x="190" y="80"/>
+    <g class="hand" font-size="13" fill="#5c6270" text-anchor="middle"><text x="82" y="160">key sentences</text><text x="213" y="160">R3</text></g>
+    <use href="#ok" x="36" y="190"/>
+    <text x="62" y="196" class="hand" font-size="14.5" fill="#1d1d1f">same EM, ≤20% shorter per step</text>
+  </g>
+</svg>

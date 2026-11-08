@@ -1,5 +1,9 @@
 # StatefulSearch-RL
 
+<p align="center">
+  <img src="docs/figures/banner.svg" alt="StatefulSearch-RL: what should a search agent remember between rounds? Four context strategies (append, window, notes, rule) shown over three search rounds" width="100%">
+</p>
+
 多跳搜索 Agent 的上下文管理强化学习：在 GRPO 训练中把「每一步的上下文怎么构造」作为唯一变量，比较 append / 滑窗 / 模型自写证据笔记 / 规则压缩四种策略，回答 **RL 能否教会模型自己提炼证据、在更少 token 下保持准确率**。
 
 - 底座：[Agent-R1](https://github.com/AgentR1/Agent-R1)（veRL 0.7.0，step-level MDP），`third_party/` 固定 SHA `b124aa4`，改动以 patch 记录
