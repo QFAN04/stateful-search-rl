@@ -30,7 +30,7 @@
 - 6 组比较，Bonferroni 阈值约 0.008：只有 2Wiki 上 C1/C2 落后于 C0/C3 稳健显著；HotpotQA / MuSiQue 上的组间差都不显著。C0 与 C3 在三个数据集上都分不出差别。
 
 ## RQ2：RL 是否学会了提炼（`runs/d10_rq2_note_quality_20261108`）
-- 方法：从 E2 的 dev 输出（训练前 step 0 / 训练后 step 150）、训练 rollouts（第 1–10 步 / 第 141–150 步）和 D9 test 抽出全部 note 调用及引用段落；自动指标看是否引用官方 supporting fact、是否含标准答案；LLM judge（DeepSeek-V4.1-Flash 判全部 751 条，Gemini 3.8 Flash 判 630 条后项目被 Google 限制）判 faithful / relevant；两个 judge 一致率 0.97 / 0.96（kappa 0.92 / 0.77），与 Claude 对 30 条的盲审（第三个模型，非人工）一致率 0.87–1.00。
+- 方法：从 E2 的 dev 输出（训练前 step 0 / 训练后 step 150）、训练 rollouts（第 1–10 步 / 第 141–150 步）和 D9 test 抽出全部 note 调用及引用段落；自动指标看是否引用官方 supporting fact、是否含标准答案；LLM judge（DeepSeek-V4.1-Flash 判全部 751 条，Gemini 3.8 Flash 判 630 条后项目被 Google 限制）判 faithful / relevant；两个 judge 一致率 0.97 / 0.96（kappa 0.92 / 0.77），与 Claude 对 30 条的盲审（第三个模型，非人工）一致率 0.87–1.00。作者本人对同一批 30 条人工复核：faithful 与 Claude 30/30 一致、与两个 judge 0.87–0.90；relevant 0.67–0.73（人工按「充分性」、judge 按「必要性」定义），relevant 结论仅供参考。
 - 结果（训练 1–10 步 → 141–150 步，DeepSeek）：faithful 0.72 → 0.81，relevant 0.93 → 0.85，引用 supporting fact 0.86 → 0.75，含答案 0.62 → 0.54；笔记条数 646 → 236（dev 58 → 14 / 500 题）。明确幻觉一直只有约 2%。
 - 结论：**笔记质量本来就不差，RL 没有把它变好，主要是让模型少写、写得更保守**（更贴原文，但更少命中关键证据）。C2 的失败在于「写得太少、保不住跨轮证据」，不是「乱写」。这为 E4（按 supporting fact 命中给笔记奖励）提供了直接依据。
 

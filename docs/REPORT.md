@@ -100,7 +100,7 @@ C3 每步更短，但会多搜几轮，每题总量在 HotpotQA / MuSiQue 上比
 
 ## 3. RL 有没有学会提炼证据（RQ2，`docs/experiment_cards/d10_rq2_note_quality.md`）
 
-从 E2 的训练 rollouts、dev 输出和 D9 输出抽出全部 note 调用及其引用段落（`runs/d10_rq2_note_quality_20261108`），自动指标看是否引用 HotpotQA 官方 supporting fact、是否含标准答案；LLM judge 判 faithful（是否被引用段落支持）/ relevant（是否记录了答题所需信息）。DeepSeek-V4.1-Flash 判全部 751 条；Gemini 3.8 Flash 判了 630 条（之后项目访问被 Google 限制）。两个 judge 一致率：faithful 0.97（kappa 0.92）、relevant 0.96（kappa 0.77）。另由 Claude 在看到 judge 结果前对 30 条做了盲审（第三个模型，不是人工标注），与两个 judge 的一致率 0.87–1.00。
+从 E2 的训练 rollouts、dev 输出和 D9 输出抽出全部 note 调用及其引用段落（`runs/d10_rq2_note_quality_20261108`），自动指标看是否引用 HotpotQA 官方 supporting fact、是否含标准答案；LLM judge 判 faithful（是否被引用段落支持）/ relevant（是否记录了答题所需信息）。DeepSeek-V4.1-Flash 判全部 751 条；Gemini 3.8 Flash 判了 630 条（之后项目访问被 Google 限制）。两个 judge 一致率：faithful 0.97（kappa 0.92）、relevant 0.96（kappa 0.77）。另由 Claude 在看到 judge 结果前对 30 条做了盲审（第三个模型），与两个 judge 的一致率 0.87–1.00；同一批 30 条由作者本人人工复核：faithful 与 Claude 完全一致（30/30）、与两个 judge 0.87–0.90；relevant 只有 0.67–0.73，原因是定义不同——人工按「充分性」判（笔记要含答案或完整的推理链），judge 按「必要性」判（记下桥接实体或比较的一侧也算）。因此 relevant 一行只作参考。
 
 | 训练中的笔记 | 第 1–10 步 | 第 141–150 步 |
 |---|---|---|
@@ -108,7 +108,7 @@ C3 每步更短，但会多搜几轮，每题总量在 HotpotQA / MuSiQue 上比
 | 送 judge 的条数 | 400（按设定随机抽样） | 236（全部） |
 | faithful = yes | 0.72（0.67–0.76） | 0.81（0.75–0.85） |
 | 明确幻觉（faithful = no） | 0.022 | 0.025 |
-| relevant = yes | 0.93（0.90–0.95） | 0.85（0.80–0.89） |
+| relevant = yes（必要性定义，仅供参考） | 0.93（0.90–0.95） | 0.85（0.80–0.89） |
 | 引用段落属于官方 supporting fact 文档 | 0.86（0.83–0.88） | 0.75（0.69–0.80） |
 | 笔记含标准答案 | 0.62 | 0.54 |
 
