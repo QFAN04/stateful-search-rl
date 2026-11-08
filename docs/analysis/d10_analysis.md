@@ -62,3 +62,10 @@
 - 多跳分层用的是 C0 的步数，不是题目自带的难度标签；2Wiki 题型是按问句启发式分的。
 - dev 一致性检查 0.508 vs 训练时 0.526（预设 ±2pp 内），新旧评测环境等价性未证实；本文的主要结论建立在 2Wiki 上 10pp 以上、p<1e-7 的差距上，不受影响；HotpotQA 上 1–2pp 的差距不应解读。
 - 单 seed；C2 结论限于「只用 EM 奖励、4B、150 步」这一设定。
+
+## 评测工程复盘（2Wiki 冷启动与内存）
+- 现象（D9）：2Wiki 单组评测约 28 分钟，前约 10 分钟 GPU 利用率为 0；10 步评测两次因容器内存（110GB）触顶被杀，worker 从 8 降到 2。
+- 根因：每次 `val_only` 冷启动时，每个 `AgentFlowWorker` 各自 `json.loads` 解析 590 万行语料、`faiss.read_index` 把 23GB Flat 索引读进私有内存，再叠加约 40GB 页缓存。
+- 改法 A：索引只读内存映射（`faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY`，需确认所用 faiss 版本对 `IndexFlat` 支持，否则 `numpy.memmap`），语料用字节偏移索引按需读取或 Arrow / Parquet 内存映射；多个 worker 共享页缓存。
+- 改法 B：检索器做成单实例常驻服务（本地 HTTP 或 Ray detached actor），多次评测复用，消除每次冷启动、恢复 8 个 worker。
+- 两者都不改变检索结果；采用前用检索冒烟 5 题核对 top-5 一致。未在 D9 实施，记录在 `docs/experiment_cards/e4_e5_candidates.md` 供 E4 评测采用。

@@ -15,7 +15,7 @@
 4. **只用 EM 奖励时，RL 没有教会模型自己记笔记。** C2 有笔记的训练轨迹比例从 10.6%（第 1–10 步）降到 4.4%（第 141–150 步）；笔记本身一直基本忠实（明确幻觉约 2%），RL 后更贴原文（faithful 0.72 → 0.81），但引用段落命中官方 supporting fact 所在文档的比例下降（0.86 → 0.75）。C2 因此接近「窗口 + 很少用的工具」，在多轮题上与 C1 一样掉分。
 5. **放宽步数上限（5 → 10）不能弥补丢证据**：检索轮数上升，但 EM 变化都在 ±1.8pp 内，组间差距不变。
 
-结论一句话：在这个设定下（单 seed、4B、LoRA、150 步），**保住旧证据是多轮题准确率的关键；规则压缩在不掉分的前提下缩短了每步上下文，但多搜的轮次抵消了大部分总 token 节省；仅靠结果奖励，RL 没有学会提炼证据**，需要过程信号或冷启动（E4 / E5 的设计见 `docs/experiment_cards/e4_e5_candidates.md`）。
+结论一句话：在这个设定下（单 seed、4B、LoRA、150 步），**保住旧证据是多轮题准确率的关键；规则压缩在不掉分的前提下缩短了每步上下文，但多搜的轮次抵消了大部分总 token 节省；仅靠结果奖励，RL 没有学会提炼证据**，下一步用过程奖励检验（E4 的设计见 `docs/experiment_cards/e4_e5_candidates.md`）。
 
 ## 1. 问题与设计
 
@@ -131,6 +131,10 @@ C3 每步更短，但会多搜几轮，每题总量在 HotpotQA / MuSiQue 上比
 - **单组 2 卡只快 1.19 倍**（`e0_c0_q3-4b-2507_lora_2gpu_pro6000_20261106`）：update_actor 快约 1.45 倍，但 rollout（约占每步一半）受最慢一条 4–5 轮串行轨迹限制，加 vLLM 副本不缩短；按 Amdahl 定律整体上限约 1.35–1.4 倍。据此改为每组 1 卡、多组并行；按实测吞吐估算，同等步数的 GPU 成本约降 40%（不是两种方案完整对照的账单结果）。
 - **修复 Agent-R1 多卡路径的三个问题**（`third_party/patches/`）：全填充 micro-batch 上 rollout-corr 断言崩溃、各卡指标条数不一致导致 `reduce_metrics` 报错、rollout dump 混入填充复制行。已向上游提交 [AgentR1/Agent-R1#113](https://github.com/AgentR1/Agent-R1/pull/113)、[AgentR1/Agent-R1#114](https://github.com/AgentR1/Agent-R1/pull/114)。
 - **评测中的问题与处理**（`d9_sealed_eval.md`）：2Wiki 的 23GB Flat 索引每个检索 worker 各载一份，页缓存累积后容器内存触顶、worker 被杀；清页缓存后按原配置重跑成功，失败的 attempt 未产出结果。
+- **复盘：2Wiki 评测的冷启动与内存。** 单组 2Wiki 评测约 28 分钟，前约 10 分钟 GPU 利用率为 0，worker 被迫从 8 降到 2。根因是每次 `val_only` 冷启动时，每个 agent worker 都各自 `json.loads` 解析 590 万行语料、用 `faiss.read_index` 把 23GB 索引读进私有内存。两种改法（都不改变检索结果）：
+  - A：索引用 `faiss.read_index(path, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)` 只读内存映射，多个 worker 共享页缓存；语料改为字节偏移索引按需读取或 Arrow / Parquet 内存映射（需先确认所用 faiss 版本对 `IndexFlat` 支持 mmap，否则用 `numpy.memmap` 存向量）。
+  - B：检索器做成单实例常驻服务（本地 HTTP 或 Ray detached actor），多次评测复用，同时去掉重复冷启动并恢复 8 个 worker。
+  这两项没有在 D9 中实施，记录为后续评测（如 E4）的改进项（`docs/experiment_cards/e4_e5_candidates.md`）。
 - 费用（估算）：E0–E3 正式训练约 70 卡时；D9 评测约 7.8 卡时；外部 judge 约 ¥0.3（DeepSeek）+ Gemini 赠金。
 
 ## 6. 局限与威胁
@@ -145,9 +149,9 @@ C3 每步更短，但会多搜几轮，每题总量在 HotpotQA / MuSiQue 上比
 
 ## 7. 后续
 
-- **E4：C2 + 笔记奖励**（答对且多轮时，按笔记引用 supporting fact 的比例给小额奖励，设上限防钻空子）。
-- **E5：C2 + SFT 冷启动**（用会写笔记的示范轨迹先做轻量 SFT，再只用 EM 训练）。
-- 设计与判读规则已写定，见 `docs/experiment_cards/e4_e5_candidates.md`；E4 / E5 都只与 E2 比、只改一个变量。
+- **E4：C2 + 笔记过程奖励**（候选，未开跑）。答对且多轮时，按笔记引用 supporting fact 文档的比例给小额奖励，设上限防钻空子；只与 E2 比、只改奖励。低成本方案：训练 80 步（E2 的笔记坍缩在前 60 步基本完成，dev EM 在 step 80 已接近最终值），对照取 E2 的 step 80 adapter，只做 5 步评测，估计约 ¥80。
+- **E5（SFT 冷启动）已取消。** RQ2 显示初始笔记格式全对、质量不差，「初始不会写」的假设基本被排除；但 RQ2 没有排除「初始写得太少、探索不足」，取消主要出于预算考虑。
+- 设计与判读规则见 `docs/experiment_cards/e4_e5_candidates.md`。
 
 ## 附：复现
 
