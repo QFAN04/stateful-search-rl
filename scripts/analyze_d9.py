@@ -135,6 +135,19 @@ def answer_metrics():
             print(f"  {name:<7} EM_gt={em_gt:.3f}  EM_alias={em_al:.3f}  F1={fl:.3f}  (recorded={rec:.3f}, n={n})")
 
 
+def token_totals():
+    """每题 prompt token 总量（各步之和）与平均步数：每步 token 少不等于每题 token 少（多搜几轮会抵消）。"""
+    print("\n===== 每题 prompt token 总量 / 平均步数（5 步上限）=====")
+    for ds in ["test", "musique", "2wiki"]:
+        row = []
+        for p in POL:
+            g = load(ds, p)
+            tot = [sum(int(s.get("prompt_tokens", 0) or 0) for s in r["steps"]) for r in g.values()]
+            row.append(f"{p} {sum(tot) / len(tot):.0f} / {sum(len(r['steps']) for r in g.values()) / len(g):.2f}")
+        print(f"  {ds}: " + " | ".join(row))
+
+
 if __name__ == "__main__":
     main()
     answer_metrics()
+    token_totals()
