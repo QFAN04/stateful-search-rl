@@ -1,6 +1,6 @@
-# 实验卡（候选，未冻结）：E4 —— C2 + 笔记过程奖励（E5 已取消）
+# 实验卡：E4 —— C2 + 笔记过程奖励（低成本 80 步方案；E5 已取消）
 
-> 状态：**候选**。2026-11-08 用户选定方案 A；同日用户决定**取消 E5**，E4 改为低成本单组方案，等报告定稿后视预算决定是否开跑。开跑前须补全「设定」并冻结、确认预算。数字只能来自 runs/<run_id>/。
+> 状态：**设定已冻结（2026-11-10，用户确认 λ=0.2、单卡、约 ¥85、14 小时硬上限）**，见下方「冻结设定」。2026-11-08 用户选定方案 A；同日用户决定**取消 E5**。数字只能来自 runs/<run_id>/。
 > 取代 PLAN §7 原定的 E4 / E5（C2、C0 第 2 个 seed）。代价：没有 seed 重复，报告中须说明。
 
 ## 动机（来自 D9 / RQ2，见 `d9_sealed_eval.md`、`d10_rq2_note_quality.md`）
@@ -31,6 +31,17 @@ D9 中 2Wiki 单组评测约 28 分钟，其中前约 10 分钟 GPU 利用率为
 - **A：只读内存映射 + 语料按需读取。** 索引改为 `faiss.read_index(path, faiss.IO_FLAG_MMAP | faiss.IO_FLAG_READ_ONLY)`，多个 worker 共享同一份页缓存，不再各复制 23GB；语料改为「字节偏移索引 + 按需读取」或 Arrow / Parquet 内存映射，只在命中 top-5 时取文本。需要先在所用 faiss 版本上确认 `IndexFlat` 支持 mmap 读取（若不支持，可把向量存成 `.npy` 用 `numpy.memmap` 打开再做内积检索）。改的是 `third_party` 的检索工具，按规则用 patch 记录。
 - **B：常驻检索服务。** 把 2Wiki 检索器作为单实例常驻进程（本地 HTTP 服务或 Ray detached actor）启动一次，多次 `val_only` 评测复用，消除每次约 10 分钟的冷启动，并恢复 8 个轻量 agent worker。B 收益更大（同时去掉重复冷启动），但改动也更大；A 改动小、先解决内存问题。
 - 两者都不改变检索结果（同一索引、同一编码模型、精确检索），不影响与 D9 的可比性；采用前用 D9 的检索冒烟 5 题核对 top-5 完全一致。
+
+## 冻结设定（2026-11-10，开跑前提交；之后不再改）
+- run_id：冒烟 `e4smoke_c2nb_q3-0p6b_lora_pro6000_<日期>`；训练 `e4_c2nb_q3-4b-2507_lora_pro6000_<日期>`；评测 `d9e4_<数据集>_<e4s{选中步}|e2s80>_q3-4b-2507_lora_pro6000_<日期>`。驱动 `scripts/autodl/e4_run.sh all`。
+- 唯一变量（相对 E2）：奖励 = EM + 0.2 · bonus（`src/ssrl/note_bonus.py`，单测 `tests/test_note_bonus.py` 10 项）。flow `configs/flows/ssrl_c2_e4.yaml` 与 `ssrl_c2.yaml` 只差 `note_bonus_lambda: 0.2` 和 `supporting_facts_path`。bonus 条件：答对、检索 ≥ 2 轮（含自动首搜）、写过笔记；bonus = 笔记引用的文档以该题 supporting fact 标题开头的比例（∈ [0, 1]）。λ = 0 时代码路径与 E0–E3 完全相同。
+- supporting fact 标题表：`scripts/build_supporting_facts.py` 由 HF `hotpotqa/hotpot_qa` distractor train + validation 生成，按问题文本匹配，Agent-R1 train 90,447 题、validation 7,405 题全部匹配；文件 sha256 `67a20d69…`（驱动脚本开跑前校验）。
+- 训练：与 E2 完全相同（Qwen3-4B-Instruct-2507、LoRA r32 / α32 / all-linear、lr 1e-5、64 题 × 8、同数据同顺序、max_prompt 8192、单步 response ≤1024、不加 KL），只是总步数 80；每 20 步存档 + dev_select 500 题 greedy 评测（开训前也评一次）。日志里 `acc` 仍是 EM，`reward` 含 bonus，另记 `note_bonus`。
+- 选择规则：dev EM（`acc`）最高的 step（20 / 40 / 60 / 80，不含 0），并列取更早。
+- 评测：E4 选中的 adapter 与 **E2 `adapters/step_80`**（对照，同为 80 步）都在 HotpotQA test 1000、MuSiQue 500、2Wiki 500 上 5 步评测；走 D9 同一路径，flow 用 `ssrl_c2`（只算 EM，口径与 E2 / D9 一致）；2Wiki 用 2 个 agent worker、加载前清页缓存（D9 的处理）。封存 test 对 E4 只跑这一次。
+- 冒烟验收（0.6B、4 步，不通过不开训）：训练正常退出；每个 rollout 都带 `note_bonus`；每条轨迹的 dump `score` = `acc + 0.2 · note_bonus`（`score` 来自 `token_level_scores`，即训练实际使用的奖励）；所有问题都在标题表里。
+- 硬件 / 预算：单卡 RTX PRO 6000 96GB（西北B，私有镜像），数据盘 150GB；预计约 12 小时、约 ¥85（冒烟约 ¥4、训练约 ¥70、评测约 ¥10，按单卡约 ¥7/h 估）；`all` 设 14 小时硬上限自动关机。
+- 停止规则：冒烟不通过 → 不训练，修复后重跑冒烟；训练崩溃 → 同命令从最近 checkpoint 续训（不改配置）；训练中笔记率与「答案原文写进笔记」比例一起监控，出现明显钻空子（如笔记大量直接抄答案）照常跑完并在结果中报告，不中途改奖励。
 
 ## 判读（事先写定）
 - 主指标：5 步评测（test / MuSiQue / 2Wiki）上 E4 vs E2（同为 80 步），重点看「C0 步数 ≥2 子集」与 2Wiki；同时列出 C0 / C3 作参照。次指标：训练笔记率曲线、笔记命中支撑文档的比例（RQ2 同方法）。

@@ -1,0 +1,22 @@
+# E4（实验卡 e4_e5_candidates.md）：与 ssrl_c2.yaml 只差笔记过程奖励 note_bonus_lambda=0.2（奖励 = EM + 0.2·bonus）。
+- name: ssrl_c2_e4
+  _target_: ssrl.env_search.SSRLSearchFlow
+  top_k: 5
+  context_policy: c2
+  window_k: 1
+  c3_max_sentences: 6
+  max_steps: 5
+  max_parallel_calls: 4
+  force_first_search: true
+
+  # BGE checkpoint. Must match `env/build_index.py --embedding_model`.
+  embedding_model_name: ${oc.env:HOTPOTQA_EMBEDDING_MODEL,BAAI/bge-large-en-v1.5}
+  # Retrieval corpus/index root. This is separate from train/validation parquet data.
+  corpus_data_dir: ${oc.env:HOTPOTQA_CORPUS_DATA_ROOT,data/corpus/hotpotqa_corpus}
+  # null: use HOTPOTQA_EMBEDDING_DEVICE (default cpu), or per-worker cuda:i
+  # if HOTPOTQA_EMBEDDING_PER_WORKER_GPU=1.
+  embedding_devices: null
+  enable_tool_parse_feedback: true
+  # E4 笔记过程奖励（src/ssrl/note_bonus.py）；supporting fact 标题由 scripts/build_supporting_facts.py 生成
+  note_bonus_lambda: 0.2
+  supporting_facts_path: ${oc.env:SSRL_SF_TITLES,/root/autodl-tmp/data/hotpotqa_sf_titles.json}

@@ -22,6 +22,7 @@ from recipes.hotpotqa.hotpotqa_agent_flow import (
 from recipes.hotpotqa.prompts import HOTPOTQA_SYSTEM_PROMPT
 from verl.utils.profiler import simple_timer
 
+from ssrl.note_bonus import load_sf_titles, note_bonus
 from ssrl.context_policies import (
     NOTES_PER_STEP,
     PolicyConfig,
@@ -80,6 +81,14 @@ class SSRLSearchFlow(SSRLHotpotQAFlow):
             c3_max_sentences=int(kwargs.get("c3_max_sentences", 6)),
         )
         self.tool_schemas = tool_schemas(self.policy_cfg.policy)
+        # E4：笔记过程奖励（λ=0 时完全不生效，E0–E3 / D9 行为不变）
+        self.note_bonus_lambda = float(kwargs.get("note_bonus_lambda", 0.0) or 0.0)
+        self.sf_titles: dict[str, list[str]] = {}
+        if self.note_bonus_lambda > 0:
+            assert self.policy_cfg.policy == "c2", "笔记奖励只用于 C2"
+            path = kwargs.get("supporting_facts_path")
+            assert path, "note_bonus_lambda > 0 需要 supporting_facts_path"
+            self.sf_titles = load_sf_titles(str(path))
 
     # ---- 检索：与 recipe _do_search / _do_search_batch 相同的容错，但记录成"一轮" ----
     def _search_round(self, st: TrajState, queries: list[str]) -> None:
@@ -110,19 +119,17 @@ class SSRLSearchFlow(SSRLHotpotQAFlow):
             logger.warning("[ssrl_search][step=%d] prompt still too long (%d > %d)", num_step, len(ids), self.prompt_length)
         return ids[: self.prompt_length], max_chars
 
-    def _extra(self, st: TrajState, anchor_obs: str, n_prompt: int, acc: float = 0.0) -> dict[str, Any]:
-        return {
-            "anchor_obs": anchor_obs,
-            "ssrl_state": st.snapshot(),
-            # 所有步的键必须一致（Agent-R1 按键拼成数组）
-            "reward_extra_info": {
-                "num_tool_steps": len(st.history_actions),
-                "acc": acc,
-                "prompt_tokens": n_prompt,
-                "num_rounds": len(st.round_passages),
-                "num_notes": len(st.notes),
-            },
+    def _extra(self, st: TrajState, anchor_obs: str, n_prompt: int, acc: float = 0.0, bonus: float = 0.0) -> dict[str, Any]:
+        info = {
+            "num_tool_steps": len(st.history_actions),
+            "acc": acc,
+            "prompt_tokens": n_prompt,
+            "num_rounds": len(st.round_passages),
+            "num_notes": len(st.notes),
         }
+        if self.note_bonus_lambda > 0:  # 同一个 run 里所有步都有这个键（Agent-R1 按键拼成数组，键必须一致）
+            info["note_bonus"] = bonus
+        return {"anchor_obs": anchor_obs, "ssrl_state": st.snapshot(), "reward_extra_info": info}
 
     async def run(self, sampling_params: dict[str, Any], **kwargs) -> AgentFlowOutput:
         question = list(kwargs["raw_prompt"])[0]["content"]
@@ -169,7 +176,12 @@ class SSRLSearchFlow(SSRLHotpotQAFlow):
                 )
                 step = await self._postprocess(step, **kwargs)
                 acc = step.extra_fields.get("reward_extra_info", {}).get("acc", 0.0)
-                step.extra_fields["reward_extra_info"] = self._extra(st, anchor_obs, len(prompt_ids), acc)["reward_extra_info"]
+                bonus = 0.0
+                if self.note_bonus_lambda > 0:  # E4：EM 之外的笔记过程奖励；acc 仍记 EM，dev 选 checkpoint 只看 acc
+                    bonus = note_bonus(acc, len(st.round_passages), [n.source for n in st.notes],
+                                       [t for _, t in st.passages], self.sf_titles.get(question.strip(), []))
+                    step.reward_score = float(step.reward_score) + self.note_bonus_lambda * bonus
+                step.extra_fields["reward_extra_info"] = self._extra(st, anchor_obs, len(prompt_ids), acc, bonus)["reward_extra_info"]
                 steps.append(step)
                 break
 
