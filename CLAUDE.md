@@ -5,7 +5,7 @@
 - **新会话先读 `docs/HANDOFF.md`**（规划会话的决策理由、已否决的方案、待办清单）。
 - 完整计划：`docs/PLAN.md`（v3，2026-11-02 定稿）。与本文件冲突时以本文件「已定决策」为准。
 - 姊妹项目：`D:/AI-Projects/agentic-verifier-code`（副项目，并行两周）。
-- 当前状态：**D1、D2 完成（见 `docs/PROGRESS.md`）；下一步 D3：AutoDL 环境测试 + C1–C3 实现。**
+- 当前状态（2026-11-10）：**项目已完成并收尾**——E0–E3 训练、D9 封存评测 + OOD、D10 分析（RQ1–RQ4）、E4（笔记过程奖励）、最终报告 `docs/REPORT.md`、README、简历 bullet 均已定稿；E5 已取消。用户之后进入「项目深挖」阶段（理解全部内容，可能需要讲解用 PPT）。所有 AutoDL 实例已关机；runs（含 adapters）在西北B文件存储 `/root/autodl-fs/ssrl-runs/`，本地 `runs/` 不含 adapters。
 
 ## 已定决策（变更需用户确认）
 - 底座：**Agent-R1（基于 veRL 0.7.0，step-level MDP）**，作为 git submodule 放在 `third_party/`，固定 SHA。
