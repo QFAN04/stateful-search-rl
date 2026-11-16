@@ -1,5 +1,7 @@
 # StatefulSearch-RL
 
+**简体中文** · [English](README.en.md)
+
 <p align="center">
   <img src="docs/figures/banner.svg" alt="StatefulSearch-RL: what should a search agent remember between rounds? Four context strategies (append, window, notes, rule) shown over three search rounds" width="100%">
 </p>
