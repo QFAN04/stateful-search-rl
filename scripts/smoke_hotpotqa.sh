@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# D1 冒烟启动器（在 GPU VM 宿主机上运行）：负责 run 目录、--resume、GCS 同步；训练本身在容器 $CONTAINER 里跑。
+# D1 冒烟启动器（在 GPU VM 宿主机上运行）：管理本地 run 目录和 --resume；训练本身在容器 $CONTAINER 里跑。
 # 用法：scripts/smoke_hotpotqa.sh --run-id <id> [--resume] [--steps 10] [--model Qwen/Qwen3-1.7B] [-- <额外 Hydra 覆盖>]
 # 约定：宿主机 ~/work 挂载为容器 /work；仓库在 ~/work/stateful-search-rl。
 set -euo pipefail
@@ -7,7 +7,6 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 CONTAINER="${CONTAINER:-ssrl}"
 CTR_REPO="${CTR_REPO:-/work/stateful-search-rl}"
 CORPUS_ROOT="${HOTPOTQA_CORPUS_DATA_ROOT:-/data/agent-r1-data/hotpotqa_corpus}"
-SYNC_EVERY="${SYNC_EVERY:-600}"   # 秒
 
 RUN_ID="" RESUME=0 STEPS=10 MODEL="Qwen/Qwen3-1.7B"
 while [[ $# -gt 0 ]]; do
@@ -25,7 +24,6 @@ done
 RUN_DIR="$REPO/runs/$RUN_ID"
 CTR_RUN_DIR="$CTR_REPO/runs/$RUN_ID"
 if [[ $RESUME -eq 1 ]]; then
-  bash "$REPO/scripts/gcp/sync_from_gcs.sh" "$RUN_ID" "$REPO/runs" || echo "WARN: sync_from_gcs 失败，只用本地 checkpoint" >&2
   # 严格续跑：没有可用 checkpoint 就停，不允许 resume_mode=auto 静默从头训练
   if [[ ! -s "$RUN_DIR/ckpt/latest_checkpointed_iteration.txt" ]]; then
     echo "--resume 但找不到 $RUN_DIR/ckpt/latest_checkpointed_iteration.txt，停止。" >&2; exit 2
@@ -53,10 +51,6 @@ ATTEMPT=$(( $(find "$RUN_DIR" -maxdepth 1 -name 'metrics.attempt*.jsonl' | wc -l
   sha256sum "$REPO/scripts/smoke_hotpotqa.sh" "$REPO/scripts/smoke_hotpotqa_inner.sh" | sed "s#$REPO/##"
   echo "extra_overrides=$*"
 } >> "$RUN_DIR/meta.txt"
-
-sync_loop() { while sleep "$SYNC_EVERY"; do bash "$REPO/scripts/gcp/sync_to_gcs.sh" "$RUN_ID" "$REPO/runs" >/dev/null 2>&1 || true; done; }
-sync_loop & SYNC_PID=$!
-trap 'kill $SYNC_PID 2>/dev/null; wait $SYNC_PID 2>/dev/null; bash "$REPO/scripts/gcp/sync_to_gcs.sh" "$RUN_ID" "$REPO/runs" || echo "ERROR: 最终 GCS 同步失败，本地数据保留在 $RUN_DIR，关机前必须补传" >&2' EXIT
 
 ${DOCKER:-sudo docker} exec \
   -e RUN_DIR="$CTR_RUN_DIR" -e STEPS="$STEPS" -e MODEL="$MODEL" -e RESUME_MODE="$RESUME_MODE" \

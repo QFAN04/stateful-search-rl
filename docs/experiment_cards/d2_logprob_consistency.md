@@ -7,7 +7,7 @@
 - 数据：dev_select 前 64 题，B1 式 prompt（问题 + recipe 检索器 top-5 段落），temperature 1.0、top_p 1.0、max_tokens 512
 
 ## 结果
-run_id `d2_logprob_q3-4b-2507_20261103`（`gs://ssrl-runs-gqf-2026/runs/d2_logprob_q3-4b-2507_20261103/logprob_consistency.json`；A100 15:42–15:45 UTC，`DONE 2026-11-03T15:45:36Z`）
+run_id `d2_logprob_q3-4b-2507_20261103`（早期云归档中的 `logprob_consistency.json`；A100 15:42–15:45 UTC，`DONE 2026-11-03T15:45:36Z`）
 
 | 指标 | 值 |
 |---|---|

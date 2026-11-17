@@ -179,10 +179,10 @@ Agent-R1 没有重写 `_save_checkpoint`/`_load_checkpoint`，用 veRL 的（`ve
 对照我们的 checkpoint 要求（模型、optimizer、scheduler、RNG、数据进度、step）：veRL 都覆盖了（step 来自目录名）。
 
 `--resume` 包装要点：
-1. 固定 `trainer.default_local_dir`、`project_name`、`experiment_name`、`total_training_steps`，`resume_mode=auto`；启动前先从 GCS 把 `latest_checkpointed_iteration.txt` 和对应 `global_step_N/` 拉回本地。
+1. 固定 `trainer.default_local_dir`、`project_name`、`experiment_name`、`total_training_steps`，`resume_mode=auto`；启动前先从所用的归档把 `latest_checkpointed_iteration.txt` 和对应 `global_step_N/` 拉回本地。
 2. 分片文件名带 world size，**恢复时 GPU 数必须一致**（单卡串行跑没问题）。
 3. **veRL 的 file logger 用 `"w"` 模式打开**（`verl/utils/tracking.py:239-246`），恢复会覆盖指标文件。每次启动设不同的 `VERL_FILE_LOGGER_PATH`（例如 `runs/<run_id>/metrics.attempt<k>.jsonl`），之后再合并。
-4. 存完一次就把 `global_step_N/` 同步到 `gs://ssrl-runs-gqf-2026/<run_id>/`；4B 全参的 optimizer 状态很大，同步时间和磁盘要在 D3 实测。
+4. 存完一次就把 `global_step_N/` 备份到所用的持久存储；4B 全参的 optimizer 状态很大，同步时间和磁盘要在 D3 实测。
 5. 轨迹落盘：`trainer.rollout_data_dir=<dir>` 会每步写 `<global_step>.jsonl`，按轨迹分组、内含每步的 input/output/score（`ray_trainer.py:142-197`、`:469-499`、`:1145-1147`）——这就是 Go/No-Go 要求的"轨迹可回放"的直接来源。验证集用 `trainer.validation_data_dir`。
 
 ## 7. 依赖版本与 Docker 镜像
@@ -319,7 +319,7 @@ cat $RUN_DIR/ckpt/latest_checkpointed_iteration.txt   # 应为 10
 # 10. 顺便验证 resume：用同样参数、total_training_steps=12、新的 VERL_FILE_LOGGER_PATH 再启动，确认日志里出现 "Resuming from .../global_step_10" 且从第 11 步开始
 
 # 11. 收尾
-gsutil -m rsync -r $RUN_DIR gs://ssrl-runs-gqf-2026/$RUN_ID
+# 在关机前备份 $RUN_DIR。
 # 在 env/GPU_ENV.md 记录：镜像 digest、pip 版本、驱动、$/h、每步耗时、峰值显存、主机内存
 # 在 docs/PROGRESS.md 追加当天一行；然后关机
 sudo shutdown -h now

@@ -3,7 +3,7 @@
 > 环境验证，不是正式实验。目的：在 AutoDL 上不用 Docker 复刻训练镜像的版本组合，确认 LoRA 路径能跑通，同时验证 Blackwell（RTX 5090）兼容性。
 
 ## 设定
-- run：`d3_autodl_envtest_q3-0p6b_lora_5090_20261104`（GCS 同名目录）
+- run：`d3_autodl_envtest_q3-0p6b_lora_5090_20261104`（云归档 同名目录）
 - 机器：AutoDL 西北区普通实例，1×RTX 5090 32GB（Blackwell，计算能力 12.0），驱动 595.71.05，16 核 / 92GB 内存；基础镜像 PyTorch 2.8 / Python 3.12 / CUDA 12.8 / Ubuntu 22.04
 - 环境：`scripts/autodl/setup_env.sh` 装进 conda base：torch 2.9.0+cu129、vLLM 0.12.0、verl 0.7.0、transformers 4.57.3、ray 2.52.1、flash-attn 2.8.1，其余按 `env/autodl/constraints.txt`（由训练镜像 pip list 生成，去掉 opencv-python-headless 的版本锁：它要求 numpy≥2，与镜像里的 numpy 1.26.4 冲突，原镜像是强装的）。完整列表：run 目录 `pip-list-autodl.txt`
 - 训练：`scripts/autodl/smoke_lora.sh` → `scripts/smoke_hotpotqa_inner.sh`，Qwen3-0.6B，LoRA rank 32 / alpha 32 / all-linear，lr 1e-5，`rollout.load_format=safetensors`，batch 8 题 × 4 条，10 步；其余同 D1 冒烟

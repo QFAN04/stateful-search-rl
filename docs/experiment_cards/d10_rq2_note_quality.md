@@ -21,7 +21,7 @@
 - 预计费用：约 1000 次调用，Vertex 赠金内（< $2）。
 
 ## 设定变更（2026-11-08，DeepSeek 开跑前写定，用户确认）
-- 起因：Gemini judge 判到 630 / 751 条时（顺序已打乱，缺失随机），Google 以「疑似违反服务条款」限制了项目 `llm-rl-lab-2026` 的 Gemini 访问（先是 token 过期 401，补判时 403）；已停止调用，由项目所有者申诉。已判的 630 条保留在 `judged_gemini.jsonl`。
+- 起因：Gemini judge 判到 630 / 751 条时（顺序已打乱，缺失随机），Google 以「疑似违反服务条款」限制了所用的云项目 的 Gemini 访问（先是 token 过期 401，补判时 403）；已停止调用，由项目所有者申诉。已判的 630 条保留在 `judged_gemini.jsonl`。
 - 变更：**全部 751 条用 DeepSeek 重判**（`deepseek-flash` = DeepSeek-V4.1-Flash，reasoning_effort high，temperature 0，JSON 模式；prompt、输入字段、抽样集合与 Gemini 完全相同），结果写 `judged_deepseek.jsonl`。
 - 主结果以 DeepSeek（覆盖全部 751 条）为准；Gemini 630 条作为第二个 judge，报告两者在共同 630 条上的一致率和 Cohen's kappa（faithful 三分类、relevant 二分类）。两个 judge 结论方向不一致时，在结论里写明并降级。
 - 人工复核：仍按原设定随机抽 30 条，Claude 复核，报告与两个 judge 各自的一致率。

@@ -23,7 +23,7 @@
 Go：1+2 满足（3 不满足则记为待修问题，不阻塞 D2）。No-Go：1 或 2 当天无法满足 → 按 CLAUDE.md 切换 Search-R1。
 
 ## 结果（跑完填写）
-有效 run：`d1_smoke_hotpotqa_q3-0p6b_20261103_0956`（`gs://ssrl-runs-gqf-2026/runs/d1_smoke_hotpotqa_q3-0p6b_20261103_0956/`）。代码 commit `76183656`，模型 **Qwen/Qwen3-0.6B**，额外覆盖 `ppo_micro_batch_size_per_gpu=1`（见 meta.txt）。
+有效 run：`d1_smoke_hotpotqa_q3-0p6b_20261103_0956`（早期云归档）。代码 commit `76183656`，模型 **Qwen/Qwen3-0.6B**，额外覆盖 `ppo_micro_batch_size_per_gpu=1`（见 meta.txt）。
 - **代码版本更正（codex D1 审查发现）**：meta.txt 里的 `76183656` 是 VM 上仓库的 HEAD，但实际运行的两个脚本是之后单独 scp 上去的，`76183656` 不能还原这次运行。实际运行的脚本等同于 commit `a20c197` 中的 `scripts/smoke_hotpotqa.sh`（含 `7e58ffc` 的 attempt 计数修复）和 `scripts/smoke_hotpotqa_inner.sh`（含 `+actor_rollout_ref.model.override_config.max_position_embeddings=5120`）。之后的启动器已改为在 meta.txt 中记录脚本 sha256 和未提交改动。
 
 - 实际时长 / 费用：训练 10 步 8 分 32 秒（attempt1，09:56–10:07 UTC），续跑 2 步（attempt2，10:20 起）。`ssrl-l4` 开机 08:10:44–10:27:57 UTC（约 2 小时 17 分，其中约 1 小时因启动脚本 bug 空转，见下）。`ssrl-a100` 两次 Spot 合计开机约 3 分钟。$/h 以 GCP 账单回填。
@@ -39,11 +39,11 @@ Go：1+2 满足（3 不满足则记为待修问题，不阻塞 D2）。No-Go：1
   2. vLLM KV cache 不足：veRL 0.7 `vLLMHttpServer` 用 `hf_config.max_position_embeddings`（Qwen3 为 40960）覆盖 `rollout.max_model_len`（`vllm_async_server.py:198`）。改为 `+actor_rollout_ref.model.override_config.max_position_embeddings=5120`。4B / A100 上同样需要。
   3. 1.7B 全参在 L4 上 actor 更新 OOM（rollout 已跑通）→ 按预案换 0.6B + micro batch 1。
   4. 训练结束后的清理阶段出现 `DataLoader worker ... killed by signal: Killed`（10/10 之后），dmesg 无 OOM 记录，不影响结果。
-- 结论与下一步：**Go（范围限定）**。Agent-R1 + veRL 0.7 栈、recipe、逐步文本回放、本地 checkpoint 续跑在单卡上可用，保留 Agent-R1，推进 D2。尚未验证：GCS 灾后恢复（从 GCS 拉回再续跑）、模型 / optimizer / RNG 恢复的逐项正确性，这些放到 D3 的 `test_resume.py`。下一步（D2）：
+- 结论与下一步：**Go（范围限定）**。Agent-R1 + veRL 0.7 栈、recipe、逐步文本回放、本地 checkpoint 续跑在单卡上可用，保留 Agent-R1，推进 D2。尚未验证：云归档 灾后恢复（从 云归档 拉回再续跑）、模型 / optimizer / RNG 恢复的逐项正确性，这些放到 D3 的 `test_resume.py`。下一步（D2）：
   - 4B probe（C0 prompt）重点看**步数分布和终止原因**（格式失败 / 作答 / 工具调用）：若 4B 也几乎一步结束，C0–C3 的上下文策略没有作用空间，需要四组统一关闭 `force_first_search` 和 / 或在 prompt 中要求先检索（属于实验设计变更，需用户确认）。
   - 4B 在单卡上的显存：1.7B 全参在 24GB 上已 OOM；4B 必须在 A100 80GB 上跑。`max_position_embeddings` 覆盖值要按 prompt+response 预算计算（不能把 5120 原样带到 8k 上下文），并在 D2 一致性检查里覆盖接近上限长度的样本。
 
 ### codex（gpt-6-astra）D1 只读审查的处理
-采纳并已修复：检查器加严并对全部 rollout 复查；"一步结束"原因改正（格式失败为主）；meta 中代码版本更正，启动器记录脚本 sha256 与未提交改动；`--resume` 找不到 checkpoint 时停止、目标已完成时直接退出；最终 GCS 同步失败时显式报错；`delete_vm.sh` 只删启动盘并先列出实例；接口笔记中过时的 C0 / 预算说明加标注；PLAN 中 B1 的 top-k 改为 5。
-暂缓（D3 正式训练前处理，记入 HANDOFF）：checkpoint 完整后再发布到 GCS 的原子同步；VM 生命周期绑定（记录实际 zone、任务结束自动停机）。
+采纳并已修复：检查器加严并对全部 rollout 复查；"一步结束"原因改正（格式失败为主）；meta 中代码版本更正，启动器记录脚本 sha256 与未提交改动；`--resume` 找不到 checkpoint 时停止、目标已完成时直接退出；最终 云归档 同步失败时显式报错；`delete_vm.sh` 只删启动盘并先列出实例；接口笔记中过时的 C0 / 预算说明加标注；PLAN 中 B1 的 top-k 改为 5。
+暂缓（D3 正式训练前处理，记入 HANDOFF）：checkpoint 完整后再发布到 云归档 的原子同步；VM 生命周期绑定（记录实际 zone、任务结束自动停机）。
 未采纳（对当前单人、单卡冒烟属于过度要求）：attempt 编号加锁防并发；把本卡改为"有条件 Go"之外再追加全部原始日志的逐项核验。

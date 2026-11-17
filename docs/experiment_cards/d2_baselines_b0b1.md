@@ -11,7 +11,7 @@
 - 硬件 / 环境：Colab A100-SXM4-80GB（高内存），vLLM 0.33.0、torch 2.14.0、transformers 5.20.2、FlagEmbedding 1.4.2（`pip_versions.txt`）。**与训练镜像（vLLM 0.12 / torch 2.9 / transformers 4.57）不同**；只推理的 EM 受影响应很小，但 D9 封存 test 上的 B0/B1 建议在训练镜像里重跑以统一环境。
 
 ## 结果
-run_id `d2_b0b1_dev_q3-4b-2507_20261103`（`gs://ssrl-runs-gqf-2026/runs/d2_b0b1_dev_q3-4b-2507_20261103/`，`summary.json`）
+run_id `d2_b0b1_dev_q3-4b-2507_20261103`（早期云归档，`summary.json`）
 
 | 基线 | EM | 带 `<answer>` 比例 | 生成耗时 |
 |---|---|---|---|

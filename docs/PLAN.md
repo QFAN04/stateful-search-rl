@@ -254,7 +254,7 @@ stateful-search-rl/
 
 | 资源 | 用途 | 备注 |
 |---|---|---|
-| **AutoDL Pro 实例（2026-11-04 起为主力；倾向 RTX PRO 6000 96GB，1–4 卡）** | E0–E5 正式训练和其评测 | 按量计费、按开机时长收费；每个实例设 `--ttl`；境内访问不了 GCS，结果经本地转存；见 `docs/notes/compute_fallback.md` |
+| **AutoDL Pro 实例（2026-11-04 起为主力；倾向 RTX PRO 6000 96GB，1–4 卡）** | E0–E5 正式训练和其评测 | 按量计费、按开机时长收费；每个实例设 `--ttl`；结果经本地转存；见 `docs/notes/compute_fallback.md` |
 | GCP A100 80GB（us-central1 Spot × 1） | D1–D2 已完成的工作；不再用于 E0–E3 | 保留桶和脚本 |
 | GCP 高内存 CPU VM（或训练机本身） | 检索服务 | 稠密索引需要大内存（几十 GB 量级），BM25 小得多。D1 实测后定 |
 | Colab A100 / G4（本机 Colab CLI，单会话最长约 12 小时） | 单卡期间只承担 B0/B1、评测和副项目；不用于 E0–E3 正式训练 | 跑完同步结果后**销毁会话** |
@@ -263,7 +263,7 @@ stateful-search-rl/
 **所有脚本的硬性规范**（适用于 GCP Spot、Colab、TC2）：
 1. 训练、生成、评测脚本都支持 `--resume`，从最近的 checkpoint 或已完成的分片继续。
 2. checkpoint 必须包含模型、optimizer、scheduler、随机数状态、数据读取进度和 step；`tests/test_resume.py` 验证恢复后指标曲线连续。
-3. 每 10–20 步、或每 30 分钟存一次，并同步到持久存储（GCS 桶；Colab 也可以用 Drive）。
+3. 每 10–20 步、或每 30 分钟存一次，并同步到持久存储（按实验平台配置）。
 4. 任务结束（成功或失败）后：同步 `runs/<id>/` 日志和结果，然后关机或销毁会话。
 
 预算分配：GCP 396 美元中约 280 美元给主项目，约 70 美元给副项目，约 46 美元缓冲；Colab 211 CU 中约 40 CU 给主项目。

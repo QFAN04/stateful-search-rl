@@ -4,7 +4,6 @@
 
 - **新会话先读 `docs/HANDOFF.md`**（规划会话的决策理由、已否决的方案、待办清单）。
 - 完整计划：`docs/PLAN.md`（v3，2026-11-02 定稿）。与本文件冲突时以本文件「已定决策」为准。
-- 姊妹项目：`D:/AI-Projects/agentic-verifier-code`（副项目，并行两周）。
 - 当前状态（2026-11-10）：**项目已完成并收尾**——E0–E3 训练、D9 封存评测 + OOD、D10 分析（RQ1–RQ4）、E4（笔记过程奖励）、最终报告 `docs/REPORT.md`、README、简历 bullet 均已定稿；E5 已取消。用户之后进入「项目深挖」阶段（理解全部内容，可能需要讲解用 PPT）。所有 AutoDL 实例已关机；runs（含 adapters）在西北B文件存储 `/root/autodl-fs/ssrl-runs/`，本地 `runs/` 不含 adapters。
 
 ## 已定决策（变更需用户确认）
@@ -56,7 +55,7 @@ D1 环境 + Go/No-Go → D2 probe + 一致性检查 → D3 策略实现 + 单测
 ## 运行规范（AutoDL / GCP Spot / Colab CLI / TC2 通用）
 - 所有训练、生成、评测脚本支持 `--resume`：从最近 checkpoint 或已完成分片继续。
 - checkpoint 包含：模型、optimizer、scheduler、RNG 状态、数据读取进度、step。`tests/test_resume.py` 验证恢复后曲线连续。
-- 每 10–20 步或 30 分钟保存一次，并同步到 GCS 桶。
+- 每 10–20 步或 30 分钟保存一次，并备份到持久存储。
 - 任务结束（无论成败）：同步 `runs/<run_id>/` 日志与结果 → 关机 / 销毁会话。
 - 每次开机记录 $/h、吞吐、峰值显存到实验卡。
 
@@ -64,8 +63,7 @@ D1 环境 + Go/No-Go → D2 probe + 一致性检查 → D3 策略实现 + 单测
 - 本地（Windows）：conda 环境 `llm-rl`（两个项目共用，`env/environment-local.yml`），无 torch。
 - GPU：Docker 镜像（veRL 0.7.x），D1 固定版本，记录在 `env/GPU_ENV.md`。
 - 代码流转：本地编辑 → push GitHub → GPU 机器 `git pull` 后运行。
-- GCP：与另一个项目共用同一个 GCP 项目；本项目用独立桶 `gs://ssrl-runs-gqf-2026`（us-central1），VM 打标签 `project=ssrl`。
-- AutoDL：本机已装第三方 CLI `autodl`（`@minato-aqukin/autodl-cli` 0.3.1，已审查：无安装脚本，token 只发往 `api.autodl.com`）。官方 API 只能建 Pro 实例（PRO6000、H800 等 7 种规格，最多 4 卡），且没有可靠库存接口，只能直接尝试创建。境内访问不了 GCS：结果先 `autodl pull` 回本地，再由本地上传到 GCS；HF / GitHub 走 `source /etc/network_turbo`。系统盘 30GB 且只有系统盘进镜像：环境装系统盘，模型和数据放数据盘或文件存储。实例连续关机 15 天会被释放。
+- AutoDL：本机已装第三方 CLI `autodl`（`@minato-aqukin/autodl-cli` 0.3.1，已审查：无安装脚本，token 只发往 `api.autodl.com`）。官方 API 只能建 Pro 实例（PRO6000、H800 等 7 种规格，最多 4 卡），且没有可靠库存接口，只能直接尝试创建。用 `autodl pull` 下载结果；HF / GitHub 走 `source /etc/network_turbo`。系统盘 30GB 且只有系统盘进镜像：环境装系统盘，模型和数据放数据盘或文件存储。实例连续关机 15 天会被释放。
 
 ## 协作分工（用户已确认；遵循 multi-model-collaboration 协议）
 - **跑通实验、拿到日志是第一优先级。** Claude 主导全局并编写核心代码。

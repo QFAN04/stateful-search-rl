@@ -31,18 +31,15 @@
 - **两周并行**：主项目 D1 启动，副项目 D2 启动，D14 一起收尾。副项目前一周以 CPU 工作为主，和主项目错峰使用 GPU。
 
 ## 4. 算力（用户已确认）
-- GCP（额度 396 美元）：**一个 GCP 项目**供两个项目共用，申请 A100 80GB × 4（按需和 Spot 的配额都申请，2 张也能开工），外加 GPUS_ALL_REGIONS=4、CPUS≈96、L4×2 作为备用。账户必须先升级为付费账户，试用账户不能挂 GPU。两个项目分别用存储桶 gs://ssrl-runs-gqf-2026 和 gs://avc-runs-gqf-2026（GCP 项目 llm-rl-lab-2026，us-central1），VM 打标签区分。
 - Colab（211 CU）：本机有 Colab CLI，单会话最长约 12 小时。用于开发、probe、副项目的生成和训练；跑完同步结果后销毁会话。
 - TC2 A40：候补（需要连学校网络，单作业 6 小时上限）。
 - 所有脚本都要支持 `--resume`，并按 checkpoint 规范保存（见 CLAUDE.md）。
 
 ## 5. 协作方式（用户已确认）
-- 协议文件：`C:\Users\GQF\.gemini\config\skills\multi-model-collaboration\SKILL.md`（软链接自 `C:\Users\GQF\.claude\skills\...`），定义 codex / dsh 等 CLI 的调用方式和防冲突规则。Gemini 通过 Antigravity CLI（`agy`，`C:\Users\GQF\.local\bin\agy.exe`）调用。
 - 用户采纳了 Gemini 的提醒"分工太碎、频繁切换 CLI 成本高"。**跑通实验、拿到日志第一；Claude 主导全局并写核心代码**；GPT（codex）只在约定节点做只读审查；Gemini / DeepSeek 只接互不相交的并行杂活；DeepSeek API 用作教师模型和 judge。可用模型以开工时查到的为准（GPT 6.1 sol / 6 astra，Gemini 4 Argon / 3.8 Flash，DeepSeek Flash）。
 
 ## 6. 本地环境
 - 新建 conda 环境 `llm-rl`（Python 3.12，**不装 torch**），两个项目共用：`conda env create -f env/environment-local.yml`。只用于单测、数据处理和画图。不复用 cs336，避免污染课程环境。
-- gcloud SDK：PATH 上只保留 `C:\Users\GQF\AppData\Local\Google\Cloud SDK\google-cloud-sdk`（自带 bundledpython）。`CLOUDSDK_PYTHON` 已删除，`D:\GoogleCloudSDK` 已从 PATH 移除（2026-11-02）。
 - 训练环境：GPU 机器上的 veRL 0.7.x Docker 镜像，D1 固定版本，记录在 `env/GPU_ENV.md`。
 
 ## 7. 当前状态与待办
@@ -59,11 +56,10 @@
   - 外部平台退路（2026-11-04 讨论，已被上一条取代）：长训练放到外部按需平台，短任务留在 GCP / Colab，预算约 100 美元，另做一次多卡扩展实验。见 `docs/notes/compute_fallback.md`。用户 11-04 正在调研各平台能否租到多卡。
   - **首次 GPU 计费开始：2026-11-03 07:21:49 UTC（北京时间 15:21）**，VM `ssrl-a100`（us-central1-c，Spot a2-ultragpu-1g）。
   - **满 48 小时 = 2026-11-05 07:22 UTC（北京时间 11-05 15:22）后提醒用户申请扩容**：`GPUS_ALL_REGIONS=4`、us-central1 `PREEMPTIBLE_NVIDIA_A100_80GB_GPUS=4`。SSD_TOTAL_GB 已于 11-03 提到 1024GB。
-  - 11-03 建机时 us-central1-a / -c 都出现过 Spot STOCKOUT，用 `scripts/gcp/retry_create.sh` 在两个 zone 间轮流重试拿到。
-- [x] 修正 `CLOUDSDK_PYTHON`（2026-11-02 已删除该用户变量，PATH 上的 gcloud 用自带 bundledpython），`gcloud auth login`，项目 `llm-rl-lab-2026`
+  - 11-03 建机时 us-central1-a / -c 都出现过 Spot STOCKOUT，用 当时的轮换重试脚本 在两个 zone 间轮流重试拿到。
 - [x] `conda env create -f env/environment-local.yml`（Python 3.12），两个仓库分别 `pip install -e .`，`pytest` 通过（2026-11-02）
 - [x] 两个仓库分别 `git init` 并做首次提交（2026-11-02）
-- [x] GitHub 私有仓库已建并 push（QFAN04/stateful-search-rl、QFAN04/agentic-verifier-code），提交身份 QIFAN004@e.ntu.edu.sg（仓库级配置）
+- [x] 项目代码已上传 GitHub。
 - [ ] 前置阅读：Agent-R1 的 step-level 设计、Search-R1 的 `search_r1/llm_agent/generation.py`、veRL 的 GRPO 配置、MemAgent（BytedTsinghua-SIA 版）
 
 Claude Code 开工后第一步（主项目 D1，详见 PLAN §8）：
@@ -76,7 +72,7 @@ Claude Code 开工后第一步（主项目 D1，详见 PLAN §8）：
 - 全参还是 LoRA（D3 实测吞吐后决定）
 - 是否需要 SFT 冷启动（D2 看 probe 的格式合法率，阈值 80%）
 - 检索语料与索引（D1 优先用 Agent-R1 自带的，否则用 Search-R1 的 e5 + wiki-18）
-- GCP 实际批下的卡数（区域已定：us-central1 为主力，与两个 GCS 桶同区）。D1 结论：us-central1 Spot A100 极不稳定（11-03 两次 2 分钟内被抢占），扩容时建议同时申请**按需** A100 80GB 配额
-- D3 正式训练前必须处理（codex D1 审查暂缓项）：checkpoint 保存完成后再同步到 GCS，指针最后发布（Spot 抢占时避免远端指针指向不完整目录）；VM 生命周期绑定（记录实际 zone，训练结束后自动同步并停机）；`test_resume.py` 覆盖"从 GCS 拉回再续跑"
+- GCP 实际批下的卡数（区域已定：us-central1 为主力，与两个 云归档 桶同区）。D1 结论：us-central1 Spot A100 极不稳定（11-03 两次 2 分钟内被抢占），扩容时建议同时申请**按需** A100 80GB 配额
+- D3 正式训练前必须处理（codex D1 审查暂缓项）：checkpoint 保存完成后再同步到 云归档，指针最后发布（Spot 抢占时避免远端指针指向不完整目录）；VM 生命周期绑定（记录实际 zone，训练结束后自动同步并停机）；`test_resume.py` 覆盖"从 云归档 拉回再续跑"
 - D1 发现（2026-11-03，见 D1 实验卡）：recipe `force_first_search=true` + 小模型 → 轨迹几乎都是 1 步，上下文策略无作用空间。D2 看 4B 的步数分布后决定是否四组统一关闭自动首搜 / 在 prompt 中要求先检索（实验设计变更，需用户确认）
 - 副项目 D11：是否做 A3（N=8 时把候选间一致数给 verifier，只推理）；若 A3 显示帮助很大且有余力，是否上"固定参照池"方案。背景与代价见副项目 PLAN §3.2（H1 已定为必做）

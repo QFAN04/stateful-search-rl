@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# D2 probe 启动器（GPU VM 宿主机上运行）：依次跑 greedy 和 sample 两种模式的 validation-only probe，结束后同步 GCS。
+# D2 probe 启动器（GPU VM 宿主机上运行）：依次跑 greedy 和 sample 两种模式的 validation-only probe，结果保存在本地 runs/。
 # 已完成的模式（val_<mode>/ 下有 jsonl）会跳过，所以被抢占后直接重跑即可续上。
 # 用法：scripts/probe_c0.sh --run-id <id> [--model Qwen/Qwen3-4B-Instruct-2507] [--modes "greedy sample"]
 set -euo pipefail
@@ -7,7 +7,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 CONTAINER="${CONTAINER:-ssrl}"
 CTR_REPO="${CTR_REPO:-/work/stateful-search-rl}"
 CORPUS_ROOT="${HOTPOTQA_CORPUS_DATA_ROOT:-/data/agent-r1-data/hotpotqa_corpus}"
-SPLITS_DIR="${SPLITS_DIR:-/data/hotpotqa_splits}"   # 由 gs://ssrl-runs-gqf-2026/data/hotpotqa_splits 拉到 ~/data
+SPLITS_DIR="${SPLITS_DIR:-/data/hotpotqa_splits}"
 
 RUN_ID="" MODEL="Qwen/Qwen3-4B-Instruct-2507" MODES="greedy sample" FLOW_CONFIG="" FLOW_NAME=""
 while [[ $# -gt 0 ]]; do
@@ -31,7 +31,6 @@ mkdir -p "$RUN_DIR"
   echo "dirty=$(git -C "$REPO" status --porcelain | tr '\n' ' ')"
   sha256sum "$REPO/scripts/probe_c0.sh" "$REPO/scripts/probe_inner.sh" | sed "s#$REPO/##"
 } >> "$RUN_DIR/meta.txt"
-trap 'bash "$REPO/scripts/gcp/sync_to_gcs.sh" "$RUN_ID" "$REPO/runs" || echo "ERROR: 最终 GCS 同步失败，本地数据保留在 $RUN_DIR" >&2' EXIT
 
 for MODE in $MODES; do
   if compgen -G "$RUN_DIR/val_$MODE/*.jsonl" >/dev/null; then echo "skip $MODE (done)"; continue; fi
@@ -42,6 +41,5 @@ for MODE in $MODES; do
     ${FLOW_CONFIG:+-e FLOW_CONFIG="$FLOW_CONFIG"} ${FLOW_NAME:+-e FLOW_NAME="$FLOW_NAME"} \
     "$CONTAINER" bash "$CTR_REPO/scripts/probe_inner.sh" 2>&1 | tee "$RUN_DIR/probe.$MODE.log"
   [[ "${PIPESTATUS[0]}" -eq 0 ]] || { echo "probe $MODE failed" >&2; exit 1; }
-  bash "$REPO/scripts/gcp/sync_to_gcs.sh" "$RUN_ID" "$REPO/runs" || true
 done
 echo PROBE_DONE

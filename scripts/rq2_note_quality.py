@@ -6,12 +6,13 @@
            Gemini 项目 2026-11-08 被 Google 限制（630/751 已判）；DeepSeek 全部 751 条重判、与 Gemini 交叉对比
   report   汇总 + Wilson 区间，写 summary.json
 用法（仓库根目录）：python -I scripts/rq2_note_quality.py extract|judge|report [--out runs/d10_rq2_note_quality_20261108]
-judge 需要 gcloud 用户登录（gcloud auth print-access-token），项目 llm-rl-lab-2026。
+Gemini judge 需要 gcloud 用户登录（gcloud auth print-access-token），并通过 GEMINI_PROJECT_ID 指定 Vertex AI 项目。
 """
 import argparse
 import glob
 import json
 import math
+import os
 import pathlib
 import random
 import re
@@ -28,7 +29,6 @@ E2 = ROOT / "runs" / "e2_c2_q3-4b-2507_lora_pro6000_20261106"
 D9 = ROOT / "runs" / "d9_test_c2_q3-4b-2507_lora_pro6000_20261108"
 HF = ROOT / "data" / "raw" / "hotpot_qa_hf"
 MODEL = "gemini-3.8-flash"
-URL = f"https://aiplatform.googleapis.com/v1/projects/llm-rl-lab-2026/locations/global/publishers/google/models/{MODEL}:generateContent"
 SEED, CAP = 20261108, 400
 TOOL = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.S)
 
@@ -154,11 +154,16 @@ def token():
 
 
 def call(rec):
+    project_id = os.environ["GEMINI_PROJECT_ID"]
+    url = (
+        f"https://aiplatform.googleapis.com/v1/projects/{project_id}"
+        f"/locations/global/publishers/google/models/{MODEL}:generateContent"
+    )
     body = {"contents": [{"role": "user", "parts": [{"text": PROMPT.format(q=rec["question"], a=rec["answer"], p=rec["passage"][:2000], n=rec["fact"])}]}],
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json", "thinkingConfig": {"thinkingLevel": "MEDIUM"}}}
     for attempt in range(5):
         try:
-            req = urllib.request.Request(URL, data=json.dumps(body).encode(), headers={"Authorization": f"Bearer {token()}", "Content-Type": "application/json"})
+            req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Authorization": f"Bearer {token()}", "Content-Type": "application/json"})
             d = json.loads(urllib.request.urlopen(req, timeout=120).read())
             txt = d["candidates"][0]["content"]["parts"][-1]["text"]
             j = json.loads(txt)
@@ -177,7 +182,6 @@ DS_MODEL = "deepseek-flash"
 
 def call_deepseek(rec):
     """同一 prompt，DeepSeek（OpenAI 兼容接口，JSON 模式）。2026-11-08 Gemini 项目被限制后全部 751 条重判、与 Gemini 交叉对比。"""
-    import os
     body = {"model": DS_MODEL, "temperature": 0, "reasoning_effort": "high", "response_format": {"type": "json_object"},
             "messages": [{"role": "user", "content": PROMPT.format(q=rec["question"], a=rec["answer"], p=rec["passage"][:2000], n=rec["fact"])}]}
     err = ""
@@ -201,6 +205,8 @@ JUDGES = {"gemini": call, "deepseek": call_deepseek}
 
 
 def judge(out, which="gemini"):
+    if which == "gemini" and not os.environ.get("GEMINI_PROJECT_ID"):
+        raise SystemExit("Set GEMINI_PROJECT_ID to your Vertex AI project ID before using the Gemini judge.")
     recs = [json.loads(line) for line in open(out / "notes.jsonl", encoding="utf-8")]
     rng = random.Random(SEED)
     todo = []

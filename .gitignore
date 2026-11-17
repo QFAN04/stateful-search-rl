@@ -7,7 +7,7 @@ __pycache__/
 .ruff_cache/
 .ipynb_checkpoints/
 
-# 实验产物（同步到 GCS，不进 git）
+# 实验产物（不进 Git）
 runs/
 checkpoints/
 outputs/

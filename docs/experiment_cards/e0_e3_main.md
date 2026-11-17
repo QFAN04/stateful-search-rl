@@ -50,7 +50,7 @@
   - 换机器后在实验卡记录新机器的驱动版本（`meta.txt` 自动记录），续训后的前 2 步检查 reward 和 `rollout_probs_diff_mean` 与暂停前衔接。
 - 每台新机器开跑前先做冒烟：`E_SMOKE=1 bash scripts/autodl/e_run.sh <要跑的 policy...>`（0.6B，每组 1 卡、各组并行，每组 4 步），确认训练、存档、adapter 保存正常，同机多组并行无冲突（Ray、vLLM 端口、检索、主机内存）。冒烟 run_id 前缀 `esmoke_`，不参与分析。
 - 脚本结束 30 分钟后自动关机，另有 `MAX_HOURS` 硬上限（见下方预计时长）。
-- 结果（不含完整 checkpoint，含 adapters）`autodl pull` 回本地，再上传 `gs://ssrl-runs-gqf-2026/runs/`。
+- 结果（不含完整 checkpoint，含 adapters）`autodl pull` 回本地，再上传 早期云归档。
 - 磁盘：4B 完整 checkpoint 实测 18GB / 个（2 卡 E0 step 20），每组保留 2 个约 36GB；数据和模型约 23GB。**双卡机（两组并行）150GB 够用（约 72GB checkpoint + 23GB）；四卡机（四组并行，约 144GB checkpoint）扩到 250GB**。每组结束且 adapter 齐全（20…140、150）后脚本删除该组完整 checkpoint，多组连跑不累积；adapter 不齐时该组记为失败并保留 checkpoint。第一次存档（step 20）后核对 checkpoint 和 adapter 大小（`runs/<id>/adapters.log`），记到下方结果。
 - 预计时长 / 费用（每组 1 卡，2026-11-06 修订；单卡每小时按 2 卡价格折半约 ¥7，以账单为准）：
   - 单卡 64×8 每步约 372 秒（D3 实测，单组独占机器；同机两组并行时的速度由开跑后前几步实测补记）。150 步约 15.5 小时 + 9 次 dev 评测和存档，每组约 **16–16.5 小时、约 ¥115**；四组约 ¥460。
